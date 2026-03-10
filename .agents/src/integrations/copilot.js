@@ -1,6 +1,5 @@
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, mkdirSync, cpSync } from 'fs';
 import { join, dirname } from 'path';
-import { execSync } from 'child_process';
 import { paths } from '../core/paths.js';
 
 /**
@@ -18,7 +17,7 @@ export const installCopilotPrompts = () => {
     // Create destination directory
     try {
         if (!existsSync(promptsDestDir)) {
-            execSync(`mkdir -p "${promptsDestDir}"`, { stdio: 'pipe' });
+            mkdirSync(promptsDestDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating prompts directory: ${error.message}`);
@@ -46,7 +45,7 @@ export const installCopilotPrompts = () => {
         try {
             const source = join(promptsSourceDir, file);
             const dest = join(promptsDestDir, file);
-            execSync(`cp "${source}" "${dest}"`, { stdio: 'pipe' });
+            cpSync(source, dest);
             console.log(`  ✓ Installed ${file}`);
             installed++;
         } catch (error) {
@@ -75,7 +74,7 @@ export const installCopilotInstructions = () => {
     const destDir = dirname(instructionsDest);
     try {
         if (!existsSync(destDir)) {
-            execSync(`mkdir -p "${destDir}"`, { stdio: 'pipe' });
+            mkdirSync(destDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating .github directory: ${error.message}`);
@@ -84,7 +83,7 @@ export const installCopilotInstructions = () => {
     
     // Copy instructions
     try {
-        execSync(`cp "${instructionsSource}" "${instructionsDest}"`, { stdio: 'pipe' });
+        cpSync(instructionsSource, instructionsDest);
         console.log(`✓ Installed GitHub Copilot universal instructions\n  Location: ${instructionsDest}\n  GitHub Copilot will now use Superpowers skills universally in all workspaces`);
     } catch (error) {
         console.log(`✗ Failed to install instructions: ${error.message}`);

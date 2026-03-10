@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "name": "superpowers:executing-plans",
+  "title": "Batch Execution with Review Checkpoints",
+  "aliases": ["execute-plan", "executing-plans", "systematic-execution"]
+}

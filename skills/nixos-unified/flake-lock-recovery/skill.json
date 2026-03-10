@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "name": "flake-lock-recovery",
+  "title": "Flake Lock Recovery and Repair",
+  "helpers": ["scripts/recover-lock.sh", "scripts/validate-lock.sh"],
+  "aliases": [
+    "flake-lock-recovery",
+    "debugging/flake-lock-recovery",
+    "nix-flake-repair"
+  ]
+}

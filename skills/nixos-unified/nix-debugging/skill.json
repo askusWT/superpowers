@@ -1,0 +1,10 @@
+{
+  "version": "2.2.0",
+  "name": "superpowers:nix-debugging/nix-debug-repl",
+  "title": "Nix REPL Debugging for Complex Architectures",
+  "aliases": [
+    "nix-debug-repl",
+    "debugging/nix-debug-repl",
+    "nix-repl-debugging"
+  ]
+}

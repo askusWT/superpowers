@@ -2,9 +2,8 @@
  * Bootstrap and setup commands for superpowers-agent
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync } from 'fs';
 import { join, dirname, parse } from 'path';
-import { execSync } from 'child_process';
 import { platform } from 'os';
 import { paths } from '../core/paths.js';
 import { readConfig } from '../core/config.js';
@@ -77,7 +76,7 @@ const updatePlatformFile = (filePath, templateContent, platforms, createIfMissin
         const timestamp = new Date().toISOString().split('T')[0];
         const backupPath = `${filePath}.backup-${timestamp}`;
         try {
-            execSync(`cp "${filePath}" "${backupPath}"`, { stdio: 'pipe' });
+            cpSync(filePath, backupPath);
         } catch (error) {
             return { updated: false, error: true, message: `Failed to backup: ${error.message}` };
         }
@@ -125,7 +124,7 @@ const updatePlatformFile = (filePath, templateContent, platforms, createIfMissin
             // Ensure directory exists
             const dir = dirname(filePath);
             if (!existsSync(dir)) {
-                execSync(`mkdir -p "${dir}"`, { stdio: 'pipe' });
+                mkdirSync(dir, { recursive: true });
             }
             
             // Determine heading based on filename
@@ -205,7 +204,7 @@ const runSetupSkills = () => {
     // Create .agents directory
     if (!existsSync(agentsDir)) {
         try {
-            execSync(`mkdir -p "${agentsDir}"`, { stdio: 'pipe' });
+            mkdirSync(agentsDir, { recursive: true });
             console.log('✓ Created .agents/ directory');
         } catch (error) {
             console.log(`✗ Failed to create .agents/ directory: ${error.message}`);
@@ -218,8 +217,8 @@ const runSetupSkills = () => {
     // Create skills directory
     if (!existsSync(skillsDir)) {
         try {
-            execSync(`mkdir -p "${skillsDir}"`, { stdio: 'pipe' });
-            execSync(`touch "${join(skillsDir, '.gitkeep')}"`, { stdio: 'pipe' });
+            mkdirSync(skillsDir, { recursive: true });
+            writeFileSync(join(skillsDir, '.gitkeep'), '');
             console.log('✓ Created .agents/skills/ directory');
         } catch (error) {
             console.log(`✗ Failed to create skills directory: ${error.message}`);
@@ -236,7 +235,7 @@ const runSetupSkills = () => {
         const timestamp = new Date().toISOString().split('T')[0];
         const backupPath = `${agentsMdPath}.backup-${timestamp}`;
         try {
-            execSync(`cp "${agentsMdPath}" "${backupPath}"`, { stdio: 'pipe' });
+            cpSync(agentsMdPath, backupPath);
             console.log(`✓ Backed up existing AGENTS.md to ${parse(backupPath).base}`);
         } catch (error) {
             console.log(`✗ Failed to backup AGENTS.md: ${error.message}`);

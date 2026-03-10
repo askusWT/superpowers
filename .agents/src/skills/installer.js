@@ -1,8 +1,43 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync, rmSync, cpSync } from 'fs';
 import { join, dirname, parse } from 'path';
-import { execSync } from 'child_process';
-import { homedir } from 'os';
+import * as cp from 'child_process';
+import * as os from 'os';
 import { getRepositories, addRepositoryToConfig, readConfigFile, writeConfigFile } from '../core/config.js';
+
+/**
+ * Basic allowlist for Git branch names (git-check-ref-format safe subset)
+ */
+export const validateBranch = (branch) => {
+    if (!branch) return null;
+    const isValid = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(branch) && !branch.includes('..');
+    return isValid ? branch : null;
+};
+
+/**
+ * Ensure a skill path is a safe relative path (no traversal or absolutes)
+ */
+export const validateSkillPath = (path) => {
+    if (typeof path !== 'string') return null;
+    if (path.startsWith('/') || path.includes('..')) return null;
+    const isValid = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(path);
+    return isValid ? path : null;
+};
+
+/**
+ * Remove a directory tree safely
+ */
+export const removeDirIfExists = (path) => {
+    if (existsSync(path)) {
+        rmSync(path, { recursive: true, force: true });
+    }
+};
+
+/**
+ * Ensure a directory exists
+ */
+export const ensureDir = (path) => {
+    mkdirSync(path, { recursive: true });
+};
 
 /**
  * Parse a Git URL or local path
@@ -68,7 +103,7 @@ export const getInstallLocation = (flags) => {
     
     // Flags override config
     if (hasGlobalFlag) {
-        return join(homedir(), '.agents', 'skills');
+        return join(os.homedir(), '.agents', 'skills');
     }
     
     if (hasProjectFlag) {
@@ -77,7 +112,7 @@ export const getInstallLocation = (flags) => {
     
     // Check config files for default
     const projectConfigPath = join(process.cwd(), '.agents', 'config.json');
-    const globalConfigPath = join(homedir(), '.agents', 'config.json');
+    const globalConfigPath = join(os.homedir(), '.agents', 'config.json');
     
     // Project config takes precedence
     for (const configPath of [projectConfigPath, globalConfigPath]) {
@@ -94,36 +129,34 @@ export const getInstallLocation = (flags) => {
     }
     
     // Default to global
-    return join(homedir(), '.agents', 'skills');
+    return join(os.homedir(), '.agents', 'skills');
 };
 
 /**
  * Clone a Git repository to a temporary directory
  */
 export const cloneRepository = (repoUrl, branch) => {
-    const tmpDir = join(homedir(), '.agents', 'tmp', `skill-install-${Date.now()}`);
+    const tmpBase = join(os.homedir(), '.agents', 'tmp');
+    const tmpDir = join(tmpBase, `skill-install-${Date.now()}`);
     
     try {
-        execSync(`mkdir -p "${tmpDir}"`, { stdio: 'pipe' });
-        
-        if (branch) {
-            execSync(`git clone --branch ${branch} --depth 1 "${repoUrl}" "${tmpDir}"`, { 
-                stdio: 'pipe',
-                timeout: 30000 
-            });
-        } else {
-            execSync(`git clone --depth 1 "${repoUrl}" "${tmpDir}"`, { 
-                stdio: 'pipe',
-                timeout: 30000 
-            });
+        ensureDir(tmpBase);
+
+        const branchArg = validateBranch(branch);
+        if (branch && !branchArg) {
+            throw new Error(`Invalid branch name: ${branch}`);
         }
-        
+
+        const args = ['clone', '--depth', '1'];
+        if (branchArg) {
+            args.push('--branch', branchArg);
+        }
+        args.push(repoUrl, tmpDir);
+
+        cp.execFileSync('git', args, { stdio: 'pipe', timeout: 30000 });
         return tmpDir;
     } catch (error) {
-        // Clean up on error
-        try {
-            execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
-        } catch {}
+        removeDirIfExists(tmpDir);
         throw new Error(`Failed to clone repository: ${error.message}`);
     }
 };
@@ -149,7 +182,13 @@ export const readSkillJsonFromPath = (path) => {
  * Install a single skill to the target location
  */
 export const installSingleSkill = (sourcePath, skillName, installBase, results) => {
-    const skillSourcePath = join(sourcePath, skillName);
+    const safeSkillName = validateSkillPath(skillName);
+    if (!safeSkillName) {
+        results.errors.push(`Invalid skill path: ${skillName}`);
+        return;
+    }
+
+    const skillSourcePath = join(sourcePath, safeSkillName);
     
     if (!existsSync(skillSourcePath)) {
         results.errors.push(`Skill directory not found: ${skillName}`);
@@ -162,13 +201,18 @@ export const installSingleSkill = (sourcePath, skillName, installBase, results) 
         return;
     }
     
-    const targetName = skillJson.name || skillName;
+    const targetNameRaw = skillJson.name || skillName;
+    const targetName = validateSkillPath(targetNameRaw);
+    if (!targetName) {
+        results.errors.push(`Invalid target skill name: ${targetNameRaw}`);
+        return;
+    }
     const targetPath = join(installBase, targetName);
     
     // Create parent directory if needed
     const targetParent = dirname(targetPath);
     try {
-        execSync(`mkdir -p "${targetParent}"`, { stdio: 'pipe' });
+        ensureDir(targetParent);
     } catch (error) {
         results.errors.push(`Failed to create directory ${targetParent}: ${error.message}`);
         return;
@@ -177,11 +221,9 @@ export const installSingleSkill = (sourcePath, skillName, installBase, results) 
     // Copy skill files
     try {
         // Remove existing skill if present
-        if (existsSync(targetPath)) {
-            execSync(`rm -rf "${targetPath}"`, { stdio: 'pipe' });
-        }
+        removeDirIfExists(targetPath);
         
-        execSync(`cp -R "${skillSourcePath}" "${targetPath}"`, { stdio: 'pipe' });
+        cpSync(skillSourcePath, targetPath, { recursive: true, force: true });
         
         results.installed.push({
             name: targetName,
@@ -316,7 +358,11 @@ Description:
             cleanup = true;
             
             if (parsed.path) {
-                sourcePath = join(sourcePath, parsed.path);
+                const safePath = validateSkillPath(parsed.path);
+                if (!safePath) {
+                    throw new Error(`Invalid repository path: ${parsed.path}`);
+                }
+                sourcePath = join(sourcePath, safePath);
                 if (!existsSync(sourcePath)) {
                     throw new Error(`Path not found in repository: ${parsed.path}`);
                 }
@@ -357,7 +403,7 @@ Description:
                 // Get the tmp directory (parent of the actual source in case of tree URLs)
                 const tmpDir = sourcePath.split('/.agents/tmp/')[0] + '/.agents/tmp/' + 
                                sourcePath.split('/.agents/tmp/')[1].split('/')[0];
-                execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+                removeDirIfExists(tmpDir);
             } catch {}
         }
         
@@ -389,7 +435,7 @@ Description:
             try {
                 const tmpDir = sourcePath.split('/.agents/tmp/')[0] + '/.agents/tmp/' + 
                                sourcePath.split('/.agents/tmp/')[1].split('/')[0];
-                execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+                removeDirIfExists(tmpDir);
             } catch {}
         }
         
@@ -523,7 +569,11 @@ Description:
             cleanup = true;
             
             if (parsed.path) {
-                sourcePath = join(sourcePath, parsed.path);
+                const safePath = validateSkillPath(parsed.path);
+                if (!safePath) {
+                    throw new Error(`Invalid repository path: ${parsed.path}`);
+                }
+                sourcePath = join(sourcePath, safePath);
                 if (!existsSync(sourcePath)) {
                     throw new Error(`Path not found in repository: ${parsed.path}`);
                 }
@@ -564,7 +614,7 @@ Description:
                 // Get the tmp directory (parent of the actual source in case of tree URLs)
                 const tmpDir = sourcePath.split('/.agents/tmp/')[0] + '/.agents/tmp/' + 
                                sourcePath.split('/.agents/tmp/')[1].split('/')[0];
-                execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+                removeDirIfExists(tmpDir);
             } catch {}
         }
         
@@ -596,7 +646,7 @@ Description:
             try {
                 const tmpDir = sourcePath.split('/.agents/tmp/')[0] + '/.agents/tmp/' + 
                                sourcePath.split('/.agents/tmp/')[1].split('/')[0];
-                execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+                removeDirIfExists(tmpDir);
             } catch {}
         }
         
@@ -650,9 +700,11 @@ Description:
     try {
         // Clone repository to temp location
         console.log(`Cloning repository: ${url}`);
-        tmpDir = join(homedir(), '.agents', 'tmp', `repo-add-${Date.now()}`);
-        execSync(`mkdir -p "${tmpDir}"`, { stdio: 'pipe' });
-        execSync(`git clone --depth 1 "${url}" "${tmpDir}"`, { 
+        const tmpBase = join(os.homedir(), '.agents', 'tmp');
+        ensureDir(tmpBase);
+        tmpDir = join(tmpBase, `repo-add-${Date.now()}`);
+
+        execFileSync('git', ['clone', '--depth', '1', url, tmpDir], { 
             stdio: 'pipe',
             timeout: 30000 
         });
@@ -684,12 +736,12 @@ Description:
         addRepositoryToConfig(alias, url, isGlobal);
         
         // Clean up
-        execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+        removeDirIfExists(tmpDir);
         
         // Report success
         const location = isGlobal ? 'globally' : 'in project';
         const configPath = isGlobal 
-            ? join(homedir(), '.agents', 'config.json')
+            ? join(os.homedir(), '.agents', 'config.json')
             : join(process.cwd(), '.agents', 'config.json');
         
         console.log(`✓ Repository added ${location}`);
@@ -703,7 +755,7 @@ Description:
         // Clean up on error
         if (tmpDir) {
             try {
-                execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+                removeDirIfExists(tmpDir);
             } catch {}
         }
         

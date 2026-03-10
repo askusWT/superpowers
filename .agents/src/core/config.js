@@ -1,6 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { paths } from './paths.js';
 
 /**
@@ -75,7 +74,7 @@ export const writeConfigFile = (config, isGlobal) => {
     try {
         // Create directory if it doesn't exist
         if (!existsSync(configDir)) {
-            execSync(`mkdir -p "${configDir}"`, { stdio: 'pipe' });
+            mkdirSync(configDir, { recursive: true });
         }
         
         writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');

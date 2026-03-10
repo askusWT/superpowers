@@ -1,6 +1,5 @@
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, mkdirSync, cpSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { paths } from '../core/paths.js';
 
 /**
@@ -18,7 +17,7 @@ export const installOpencodeCommands = () => {
     // Create destination directory
     try {
         if (!existsSync(commandsDestDir)) {
-            execSync(`mkdir -p "${commandsDestDir}"`, { stdio: 'pipe' });
+            mkdirSync(commandsDestDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating opencode commands directory: ${error.message}`);
@@ -46,7 +45,7 @@ export const installOpencodeCommands = () => {
         try {
             const source = join(commandsSourceDir, file);
             const dest = join(commandsDestDir, file);
-            execSync(`cp "${source}" "${dest}"`, { stdio: 'pipe' });
+            cpSync(source, dest);
             console.log(`  ✓ Installed ${file}`);
             installed++;
         } catch (error) {

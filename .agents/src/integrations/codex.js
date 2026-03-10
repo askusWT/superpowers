@@ -1,6 +1,5 @@
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, mkdirSync, cpSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { paths } from '../core/paths.js';
 
 /**
@@ -18,7 +17,7 @@ export const installCodexPrompts = () => {
     // Create destination directory
     try {
         if (!existsSync(promptsDestDir)) {
-            execSync(`mkdir -p "${promptsDestDir}"`, { stdio: 'pipe' });
+            mkdirSync(promptsDestDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating Codex prompts directory: ${error.message}`);
@@ -46,7 +45,7 @@ export const installCodexPrompts = () => {
         try {
             const source = join(promptsSourceDir, file);
             const dest = join(promptsDestDir, file);
-            execSync(`cp "${source}" "${dest}"`, { stdio: 'pipe' });
+            cpSync(source, dest);
             console.log(`  ✓ Installed ${file}`);
             installed++;
         } catch (error) {

@@ -1,6 +1,5 @@
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, mkdirSync, cpSync, chmodSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { paths } from '../core/paths.js';
 
 /**
@@ -18,7 +17,7 @@ export const installCursorCommands = () => {
     // Create destination directory
     try {
         if (!existsSync(commandsDestDir)) {
-            execSync(`mkdir -p "${commandsDestDir}"`, { stdio: 'pipe' });
+            mkdirSync(commandsDestDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating Cursor commands directory: ${error.message}`);
@@ -46,7 +45,7 @@ export const installCursorCommands = () => {
         try {
             const source = join(commandsSourceDir, file);
             const dest = join(commandsDestDir, file);
-            execSync(`cp "${source}" "${dest}"`, { stdio: 'pipe' });
+            cpSync(source, dest);
             console.log(`  ✓ Installed ${file}`);
             installed++;
         } catch (error) {
@@ -76,7 +75,7 @@ export const installCursorHooks = () => {
     // Create destination directory
     try {
         if (!existsSync(hooksDestDir)) {
-            execSync(`mkdir -p "${hooksDestDir}"`, { stdio: 'pipe' });
+            mkdirSync(hooksDestDir, { recursive: true });
         }
     } catch (error) {
         console.log(`Error creating Cursor hooks directory: ${error.message}`);
@@ -85,7 +84,7 @@ export const installCursorHooks = () => {
 
     // Copy hooks.json
     try {
-        execSync(`cp "${hooksJsonSource}" "${hooksJsonDest}"`, { stdio: 'pipe' });
+        cpSync(hooksJsonSource, hooksJsonDest);
         console.log('  ✓ Installed hooks.json');
     } catch (error) {
         console.log(`  ✗ Failed to install hooks.json: ${error.message}`);
@@ -113,8 +112,8 @@ export const installCursorHooks = () => {
         try {
             const source = join(hooksSourceDir, file);
             const dest = join(hooksDestDir, file);
-            execSync(`cp "${source}" "${dest}"`, { stdio: 'pipe' });
-            execSync(`chmod +x "${dest}"`, { stdio: 'pipe' });
+            cpSync(source, dest);
+            chmodSync(dest, 0o755);
             console.log(`  ✓ Installed ${file}`);
             installed++;
         } catch (error) {

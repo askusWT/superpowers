@@ -19,7 +19,8 @@
     "dev": "node src/cli.js",
     "watch": "node build.js --watch",
     "dev:link": "node scripts/link.cjs dev",
-    "production:link": "node scripts/link.cjs production"
+    "production:link": "node scripts/link.cjs production",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "devDependencies": {
     "esbuild": "^0.21.0"

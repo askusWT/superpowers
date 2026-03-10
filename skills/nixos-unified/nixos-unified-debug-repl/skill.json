@@ -1,0 +1,33 @@
+{
+  "name": "nixos-unified-debug-repl",
+  "description": "Systematic debugging for nixos-unified template contexts with complex module systems and flake-parts architecture",
+  "version": "1.0.0",
+  "superpowers": [
+    "complex-context-evaluation",
+    "module-trace-analysis",
+    "flake-parts-debugging",
+    "auto-import-debugging",
+    "host-aware-debugging",
+    "overlay-conflict-detection",
+    "nixd-integration",
+    "systematic-repl-workflows"
+  ],
+  "tags": [
+    "nixos-unified",
+    "debugging",
+    "repl",
+    "flake-parts",
+    "module-system",
+    "auto-imports",
+    "host-aware"
+  ],
+  "dependencies": {
+    "tools": ["nix", "nixd", "alejandra", "statix", "just"],
+    "skills": ["nix-debugging"]
+  },
+  "entry_point": "SKILL.md",
+  "author": "opencode",
+  "license": "MIT",
+  "repository": "https://github.com/sst/opencode",
+  "created": "2025-12-06"
+}

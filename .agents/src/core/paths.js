@@ -55,14 +55,26 @@ export const paths = {
     get projectSkillsDir() { return join(this.projectRoot, 'skills'); }, // For superpowers repo itself
     get homePersonalSkills() { return join(this.home, '.agents', 'skills'); },
     get bootstrap() { return join(this.projectRoot, '.agents', 'superpowers-bootstrap.md'); },
-    get superpowersRepo() { 
-        // If running from the superpowers repo itself, use current location
-        // Otherwise use installed location
-        // Navigate from src/core/ up to repo root
+    get superpowersRepo() {
+        // 1) Explicit override for non-standard layouts (e.g., pinned dev shell)
+        const envRepo = process.env.SUPERPOWERS_REPO;
+        if (envRepo && existsSync(envRepo)) {
+            return envRepo;
+        }
+
+        // 2) If templates live next to the running binary (built checkout), use that
+        const bundledTemplate = join(__dirname, 'templates', 'AGENTS.md.template');
+        if (existsSync(bundledTemplate)) {
+            return __dirname;
+        }
+
+        // 3) If running from the source repo (unbundled), detect from src/ location
         const currentRepoCheck = join(__dirname, '..', '..', '..', 'skills');
         if (existsSync(currentRepoCheck) && existsSync(join(__dirname, '..', '..', '..', '.github', 'prompts'))) {
             return join(__dirname, '..', '..', '..');
         }
+
+        // 4) Fallback to global install location
         return join(this.home, '.agents', 'superpowers');
     },
     get homeSuperpowersSkills() { return join(this.superpowersRepo, 'skills'); },

@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { paths } from './paths.js';
 
 /**
@@ -6,7 +6,7 @@ import { paths } from './paths.js';
  */
 export const isRepoClean = () => {
     try {
-        const output = execSync('git status --porcelain --untracked-files=no', {
+        const output = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe',
@@ -23,7 +23,7 @@ export const isRepoClean = () => {
  */
 export const isOnMainBranch = () => {
     try {
-        const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+        const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe',
@@ -41,7 +41,7 @@ export const isOnMainBranch = () => {
 export const checkForUpdates = () => {
     try {
         // Fetch latest from origin
-        execSync('git fetch origin', {
+        execFileSync('git', ['fetch', 'origin'], {
             cwd: paths.superpowersRepo,
             timeout: 5000,
             stdio: 'pipe'
@@ -51,13 +51,13 @@ export const checkForUpdates = () => {
         const hasLocalChanges = !isRepoClean();
 
         // Get current and latest commits
-        const currentCommit = execSync('git rev-parse HEAD', {
+        const currentCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe'
         }).trim();
 
-        const latestCommit = execSync('git rev-parse origin/main', {
+        const latestCommit = execFileSync('git', ['rev-parse', 'origin/main'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe'
@@ -77,14 +77,14 @@ export const checkForUpdates = () => {
         }
 
         // Count commits behind
-        const commitsBehind = parseInt(execSync('git rev-list --count HEAD..origin/main', {
+        const commitsBehind = parseInt(execFileSync('git', ['rev-list', '--count', 'HEAD..origin/main'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe'
         }).trim(), 10);
 
         // Get changed files
-        const changedFilesOutput = execSync('git diff --name-only HEAD origin/main', {
+        const changedFilesOutput = execFileSync('git', ['diff', '--name-only', 'HEAD', 'origin/main'], {
             cwd: paths.superpowersRepo,
             encoding: 'utf8',
             stdio: 'pipe'

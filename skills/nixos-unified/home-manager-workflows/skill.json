@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "name": "home-manager-workflows",
+  "title": "Home Manager Configuration Workflows",
+  "helpers": ["scripts/update-config.sh", "scripts/test-config.sh"],
+  "aliases": ["home-manager-workflows", "hm-workflows", "config-workflows"]
+}

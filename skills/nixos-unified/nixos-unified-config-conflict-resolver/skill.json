@@ -1,0 +1,32 @@
+{
+  "name": "nixos-unified-config-conflict-resolver",
+  "description": "Systematic resolution of configuration conflicts in nixos-unified + flake-parts architectures, focusing on module imports, overlays, and option definitions",
+  "version": "1.0.0",
+  "superpowers": [
+    "module-conflict-detection",
+    "option-conflict-resolution",
+    "overlay-integration",
+    "incremental-resolution",
+    "auto-import-debugging",
+    "nixcats-integration",
+    "platform-specific-conflicts",
+    "crisis-prevention"
+  ],
+  "tags": [
+    "nixos-unified",
+    "conflict-resolution",
+    "module-system",
+    "overlays",
+    "configuration",
+    "flake-parts"
+  ],
+  "dependencies": {
+    "tools": ["nix", "nixd", "statix", "alejandra", "just"],
+    "skills": ["config-conflict-resolver", "nix-debugging"]
+  },
+  "entry_point": "SKILL.md",
+  "author": "opencode",
+  "license": "MIT",
+  "repository": "https://github.com/sst/opencode",
+  "created": "2025-12-06"
+}

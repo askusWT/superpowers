@@ -2,7 +2,6 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
-import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -44,14 +43,11 @@ export const printVersion = () => {
 export const getRemoteVersion = async () => {
     try {
         const url = 'https://raw.githubusercontent.com/complexthings/superpowers/main/.agents/package.json';
-        
-        // Use execSync with curl for compatibility with older Node versions
-        const response = execSync(`curl -sS "${url}"`, {
-            encoding: 'utf8',
-            timeout: 10000
-        });
-        
-        const pkg = JSON.parse(response);
+        const response = await fetch(url, { redirect: 'follow' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const pkg = await response.json();
         
         // If version field doesn't exist, return current version (no update available)
         if (!pkg.version) {

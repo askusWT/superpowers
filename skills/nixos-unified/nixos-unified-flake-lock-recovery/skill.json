@@ -1,0 +1,32 @@
+{
+  "name": "nixos-unified-flake-lock-recovery",
+  "description": "Systematic recovery and repair of flake.lock files in nixos-unified + flake-parts architectures with complex input following and dependency chains",
+  "version": "1.0.0",
+  "superpowers": [
+    "input-chain-analysis",
+    "incremental-lock-recovery",
+    "dependency-preservation",
+    "validation-first-recovery",
+    "crisis-prevention",
+    "backup-strategies",
+    "input-following-repair",
+    "overlay-integration"
+  ],
+  "tags": [
+    "nixos-unified",
+    "flake-lock",
+    "recovery",
+    "input-chains",
+    "dependency-management",
+    "flake-parts"
+  ],
+  "dependencies": {
+    "tools": ["nix", "jq", "git", "just"],
+    "skills": ["flake-lock-recovery", "nix-debugging"]
+  },
+  "entry_point": "SKILL.md",
+  "author": "opencode",
+  "license": "MIT",
+  "repository": "https://github.com/sst/opencode",
+  "created": "2025-12-06"
+}

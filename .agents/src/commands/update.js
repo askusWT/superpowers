@@ -2,7 +2,7 @@
  * Update commands for superpowers-agent
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { paths } from '../core/paths.js';
 import { writeConfig } from '../core/config.js';
 import { checkForUpdates, isOnMainBranch, determineReinstalls } from '../core/git.js';
@@ -96,7 +96,7 @@ const runUpdate = (options = {}) => {
    (${updateInfo.commitsBehind} new commit${updateInfo.commitsBehind > 1 ? 's' : ''})\n`);
     
     try {
-        execSync('git pull origin main', { 
+        execFileSync('git', ['pull', 'origin', 'main'], { 
             cwd: paths.superpowersRepo, 
             stdio: 'pipe',
             timeout: 10000

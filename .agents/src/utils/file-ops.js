@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 /**
  * Detect if a command is available
@@ -7,9 +7,9 @@ import { execSync } from 'child_process';
  */
 export const detectTool = (command) => {
     try {
-        execSync(`which ${command}`, { 
+        execFileSync('which', [command], {
             stdio: 'pipe',
-            timeout: 2000 
+            timeout: 2000
         });
         return true;
     } catch {

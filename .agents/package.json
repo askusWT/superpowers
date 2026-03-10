@@ -22,7 +22,7 @@
     "watch": "bun build.js --watch",
     "dev:link": "bun scripts/link.cjs dev",
     "production:link": "bun scripts/link.cjs production",
-    "test": "node --test "test/**/*.test.js""
+    "test": "node --test \"test/**/*.test.js\""
   },
   "devDependencies": {
     "husky": "^9.1.7"

@@ -1,5 +1,6 @@
-import { existsSync, readdirSync, mkdirSync, cpSync } from 'fs';
+import { existsSync, readdirSync, lstatSync, symlinkSync, unlinkSync, mkdirSync, readlinkSync, cpSync } from 'fs';
 import { join } from 'path';
+import { platform } from 'os';
 import { paths } from '../core/paths.js';
 
 /**
@@ -14,7 +15,6 @@ export const installOpencodeCommands = () => {
         return;
     }
 
-    // Create destination directory
     try {
         if (!existsSync(commandsDestDir)) {
             mkdirSync(commandsDestDir, { recursive: true });
@@ -24,7 +24,6 @@ export const installOpencodeCommands = () => {
         return;
     }
 
-    // Copy all .md files
     let commandFiles;
     try {
         commandFiles = readdirSync(commandsSourceDir)
@@ -54,6 +53,100 @@ export const installOpencodeCommands = () => {
     }
 
     if (installed > 0) {
-        console.log(`\n✓ Installed ${installed} command(s) to ${commandsDestDir}\n  Use slash commands in opencode:\n    /brainstorm - Refine ideas into designs\n    /execute-plan - Execute plans in batches\n    /write-plan - Create implementation plans\n    /write-skill - Create new skills with TDD\n    /skills - Discover available skills\n    /use-skill - Load and apply a specific skill`);
+        console.log(`
+✓ Installed ${installed} command(s) to ${commandsDestDir}
+  Use slash commands in opencode:
+    /brainstorm - Refine ideas into designs
+    /execute-plan - Execute plans in batches
+    /write-plan - Create implementation plans
+    /write-skill - Create new skills with TDD
+    /skills - Discover available skills
+    /use-skill - Load and apply a specific skill`);
+    }
+};
+
+const isSymlink = (path) => {
+    try {
+        return lstatSync(path).isSymbolicLink();
+    } catch {
+        return false;
+    }
+};
+
+const symlinkPointsTo = (linkPath, expectedSource) => {
+    try {
+        if (!isSymlink(linkPath)) return false;
+        const currentTarget = readlinkSync(linkPath);
+        return currentTarget === expectedSource;
+    } catch {
+        return false;
+    }
+};
+
+export const installOpencodePluginSymlink = () => {
+    const sourcePlugin = join(paths.superpowersRepo, '.opencode', 'plugins', 'superpowers-agent.js');
+    const destPluginsDir = join(paths.home, '.config', 'opencode', 'plugins');
+    const destPlugin = join(destPluginsDir, 'superpowers-agent.js');
+
+    console.log('Installing OpenCode plugin symlink...');
+
+    if (!existsSync(sourcePlugin)) {
+        console.log('⚠️  Source plugin not found, skipping symlink creation');
+        console.log(`   Expected at: ${sourcePlugin}`);
+        return { created: false, error: 'Source plugin not found' };
+    }
+
+    if (symlinkPointsTo(destPlugin, sourcePlugin)) {
+        console.log('✓ Plugin symlink already exists and is correct');
+        return { created: false, existed: true };
+    }
+
+    if (existsSync(destPlugin) && !isSymlink(destPlugin)) {
+        console.log('⚠️  Warning: A file already exists at the destination path');
+        console.log(`   Path: ${destPlugin}`);
+        console.log('   Skipping symlink creation to avoid overwriting existing file');
+        console.log('   To use superpowers-agent plugin, manually remove or rename the existing file');
+        return { created: false, error: 'File already exists at destination' };
+    }
+
+    if (!existsSync(destPluginsDir)) {
+        try {
+            mkdirSync(destPluginsDir, { recursive: true });
+            console.log(`✓ Created ${destPluginsDir.replace(paths.home, '~')}`);
+        } catch (error) {
+            console.log(`⚠️  Failed to create plugins directory: ${error.message}`);
+            return { created: false, error: `Failed to create directory: ${error.message}` };
+        }
+    }
+
+    if (isSymlink(destPlugin)) {
+        try {
+            unlinkSync(destPlugin);
+        } catch (error) {
+            console.log(`⚠️  Failed to remove existing symlink: ${error.message}`);
+            return { created: false, error: `Failed to remove existing symlink: ${error.message}` };
+        }
+    }
+
+    const plat = platform();
+    try {
+        if (plat === 'win32') {
+            symlinkSync(sourcePlugin, destPlugin, 'file');
+        } else {
+            symlinkSync(sourcePlugin, destPlugin);
+        }
+        const shortSource = sourcePlugin.replace(paths.home, '~');
+        const shortDest = destPlugin.replace(paths.home, '~');
+        console.log(`✓ Created symlink: ${shortDest}`);
+        console.log(`  -> ${shortSource}`);
+        return { created: true };
+    } catch (error) {
+        if (plat === 'win32' && error.code === 'EPERM') {
+            console.log('⚠️  Windows requires Developer Mode or admin privileges for symlinks');
+            console.log('   Enable Developer Mode: Settings > Update & Security > For developers');
+            return { created: false, error: 'Windows symlink permission denied' };
+        }
+        console.log(`⚠️  Failed to create symlink: ${error.message}`);
+        return { created: false, error: `Failed to create symlink: ${error.message}` };
     }
 };

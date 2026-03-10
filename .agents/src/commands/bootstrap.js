@@ -13,8 +13,7 @@ import { toolDetection, detectPlatforms } from '../core/platform-detection.js';
 
 // Import all integration installers
 import { 
-    installCopilotPrompts, 
-    installCopilotInstructions 
+    installCopilotPrompts 
 } from '../integrations/copilot.js';
 import { 
     installCursorCommands, 
@@ -23,27 +22,27 @@ import {
 import { installCodexPrompts } from '../integrations/codex.js';
 import { installGeminiCommands } from '../integrations/gemini.js';
 import { installClaudeCommands } from '../integrations/claude.js';
-import { installOpencodeCommands } from '../integrations/opencode.js';
+import { installOpencodeCommands, installOpencodePluginSymlink } from '../integrations/opencode.js';
 
 // Import update function
 import { runUpdate } from './update.js';
 
+// Import symlink utilities
+import { syncAllSkillSymlinks, syncProjectSkillSymlinks } from '../utils/symlinks.js';
+
 /**
- * Generate tool mappings for specified platforms
+ * Generate tool mappings by reading the generic TOOLS.md.template
  */
-const generateToolMappings = (platforms) => {
-    // This is a simplified version - full implementation would read from templates
-    const mappings = {
-        'github-copilot': 'GitHub Copilot',
-        'cursor': 'Cursor',
-        'claude-code': 'Claude Code',
-        'opencode': 'OpenCode',
-        'gemini': 'Gemini',
-        'codex': 'Codex'
-    };
-    
-    const lines = platforms.map(p => `**Tool Mapping for ${mappings[p]}:**`);
-    return lines.join('\n');
+const generateToolMappings = () => {
+    const templatePath = join(paths.superpowersRepo, '.agents', 'templates', 'TOOLS.md.template');
+    if (existsSync(templatePath)) {
+        try {
+            return readFileSync(templatePath, 'utf8').trim();
+        } catch (error) {
+            return '### Using Tools\n\nUse your native skill tool. Fallback: `superpowers-agent find-skills`';
+        }
+    }
+    return '';
 };
 
 /**
@@ -57,8 +56,8 @@ const updatePlatformFile = (filePath, templateContent, platforms, createIfMissin
         return { updated: false, created: false, skipped: true };
     }
     
-    // Generate tool mappings for the specified platforms
-    const toolMappings = generateToolMappings(platforms);
+    // Generate tool mappings from generic template
+    const toolMappings = generateToolMappings();
     
     // Replace placeholder in template
     let content = templateContent.replace(/\{\{TOOL_MAPPINGS\}\}/g, toolMappings);
@@ -146,12 +145,58 @@ const updatePlatformFile = (filePath, templateContent, platforms, createIfMissin
  */
 const installUnixAliases = () => {
     console.log('Installing Unix aliases...');
-    const aliasPath = join(paths.superpowersRepo, '.agents', 'superpowers-agent');
+    const sourceAgentPath = join(paths.superpowersRepo, '.agents', 'superpowers-agent');
+    const binDir = join(paths.home, '.local', 'bin');
+    const agentLinkPath = join(binDir, 'superpowers-agent');
+    const superpowersLinkPath = join(binDir, 'superpowers');
     
-    if (existsSync(aliasPath)) {
-        console.log(`✓ Alias available at: ${aliasPath}`);
-    } else {
+    // Check if source executable exists
+    if (!existsSync(sourceAgentPath)) {
         console.log('⚠️  superpowers-agent executable not found');
+        return;
+    }
+    
+    // Create ~/.local/bin directory if it doesn't exist
+    if (!existsSync(binDir)) {
+        try {
+            execSync(`mkdir -p "${binDir}"`, { stdio: 'pipe' });
+            console.log(`✓ Created ${binDir}`);
+        } catch (error) {
+            console.log(`⚠️  Failed to create ${binDir}: ${error.message}`);
+            return;
+        }
+    }
+    
+    // Create or update superpowers-agent symlink
+    try {
+        if (existsSync(agentLinkPath)) {
+            // Remove existing symlink
+            execSync(`rm "${agentLinkPath}"`, { stdio: 'pipe' });
+        }
+        execSync(`ln -s "${sourceAgentPath}" "${agentLinkPath}"`, { stdio: 'pipe' });
+        console.log(`✓ Created symlink: superpowers-agent -> ${sourceAgentPath}`);
+    } catch (error) {
+        console.log(`⚠️  Failed to create superpowers-agent symlink: ${error.message}`);
+    }
+    
+    // Create or update superpowers symlink
+    try {
+        if (existsSync(superpowersLinkPath)) {
+            // Remove existing symlink
+            execSync(`rm "${superpowersLinkPath}"`, { stdio: 'pipe' });
+        }
+        execSync(`ln -s "${sourceAgentPath}" "${superpowersLinkPath}"`, { stdio: 'pipe' });
+        console.log(`✓ Created symlink: superpowers -> ${sourceAgentPath}`);
+    } catch (error) {
+        console.log(`⚠️  Failed to create superpowers symlink: ${error.message}`);
+    }
+    
+    // Check if ~/.local/bin is in PATH
+    const pathEnv = process.env.PATH || '';
+    if (!pathEnv.includes(binDir)) {
+        console.log(`\n⚠️  Warning: ${binDir} is not in your PATH`);
+        console.log('   Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):');
+        console.log(`   export PATH="$HOME/.local/bin:$PATH"\n`);
     }
 };
 
@@ -175,6 +220,108 @@ const installAliases = () => {
         return installWindowsAliases();
     } else {
         return installUnixAliases();
+    }
+};
+
+/**
+ * Update .github/copilot-instructions.md in a project with Superpowers content
+ * 
+ * Reads the template from .github/copilot-instructions.md in the superpowers repo,
+ * replaces ${content} with the using-superpowers SKILL.md content, and installs to
+ * the project's .github/copilot-instructions.md.
+ * Uses marker-based update-in-place for idempotent updates.
+ */
+const updateCopilotInstructions = (projectRoot) => {
+    const instructionsSource = join(paths.superpowersRepo, '.github', 'copilot-instructions.md');
+    const skillSource = join(paths.superpowersRepo, 'skills', 'meta', 'using-superpowers', 'SKILL.md');
+    const instructionsDest = join(projectRoot, '.github', 'copilot-instructions.md');
+    
+    const START_MARKER = '<!-- SUPERPOWERS_-_INSTRUCTIONS_START -->';
+    const END_MARKER = '<!-- SUPERPOWERS_-_INSTRUCTIONS_END -->';
+    
+    if (!existsSync(instructionsSource)) {
+        return { error: true, message: 'Source template not found' };
+    }
+    
+    if (!existsSync(skillSource)) {
+        return { error: true, message: 'using-superpowers SKILL.md not found' };
+    }
+    
+    // Read the template and skill content
+    let templateContent;
+    let skillContent;
+    try {
+        templateContent = readFileSync(instructionsSource, 'utf8');
+        skillContent = readFileSync(skillSource, 'utf8');
+    } catch (error) {
+        return { error: true, message: `Failed to read source files: ${error.message}` };
+    }
+    
+    // Replace ${content} placeholder with actual skill content
+    const processedContent = templateContent.replace('${content}', skillContent);
+    
+    // Verify markers are present in the processed content
+    if (!processedContent.includes(START_MARKER) || !processedContent.includes(END_MARKER)) {
+        return { error: true, message: 'Template is missing required markers' };
+    }
+    
+    // Create .github directory if needed
+    const destDir = dirname(instructionsDest);
+    try {
+        if (!existsSync(destDir)) {
+            execSync(`mkdir -p "${destDir}"`, { stdio: 'pipe' });
+        }
+    } catch (error) {
+        return { error: true, message: `Failed to create .github directory: ${error.message}` };
+    }
+    
+    // Check if destination file already exists
+    if (existsSync(instructionsDest)) {
+        let existingContent;
+        try {
+            existingContent = readFileSync(instructionsDest, 'utf8');
+        } catch (error) {
+            return { error: true, message: `Failed to read existing file: ${error.message}` };
+        }
+        
+        // Backup the existing file
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupPath = `${instructionsDest}.backup-${timestamp}`;
+        try {
+            execSync(`cp "${instructionsDest}" "${backupPath}"`, { stdio: 'pipe' });
+        } catch (error) {
+            return { error: true, message: `Failed to backup: ${error.message}` };
+        }
+        
+        // Check if file already has markers
+        if (existingContent.includes(START_MARKER) && existingContent.includes(END_MARKER)) {
+            // Replace content between markers (inclusive of markers)
+            const regex = new RegExp(`${START_MARKER}[\\s\\S]*?${END_MARKER}`, 'g');
+            const newContent = existingContent.replace(regex, processedContent.trim());
+            try {
+                writeFileSync(instructionsDest, newContent, 'utf8');
+                return { updated: true, backup: backupPath };
+            } catch (error) {
+                return { error: true, message: `Failed to update: ${error.message}` };
+            }
+        } else {
+            // No markers found - append the new content to end of file
+            const newContent = existingContent.trimEnd() + '\n\n' + processedContent.trim() + '\n';
+            try {
+                writeFileSync(instructionsDest, newContent, 'utf8');
+                return { updated: true, backup: backupPath };
+            } catch (error) {
+                return { error: true, message: `Failed to append: ${error.message}` };
+            }
+        }
+    } else {
+        // No existing file - write the processed content directly
+        try {
+            writeFileSync(instructionsDest, processedContent, 'utf8');
+            return { created: true };
+        } catch (error) {
+            return { error: true, message: `Failed to create: ${error.message}` };
+        }
     }
 };
 
@@ -228,6 +375,22 @@ const runSetupSkills = () => {
         console.log('✓ .agents/skills/ directory exists');
     }
 
+    // Create docs directory and copy SUPERPOWERS.md
+    const docsDir = join(agentsDir, 'docs');
+    const superpowersMdPath = join(docsDir, 'SUPERPOWERS.md');
+    const superpowersTemplatePath = join(paths.superpowersRepo, '.agents', 'templates', 'SUPERPOWERS.md.template');
+
+    if (!existsSync(docsDir)) {
+        try {
+            execSync(`mkdir -p "${docsDir}"`, { stdio: 'pipe' });
+            console.log('✓ Created .agents/docs/ directory');
+        } catch (error) {
+            console.log(`⚠️  Failed to create docs directory: ${error.message}`);
+        }
+    } else {
+        console.log('✓ .agents/docs/ directory exists');
+    }
+
     // Handle existing AGENTS.md
     const agentsMdExists = existsSync(agentsMdPath);
     
@@ -255,6 +418,22 @@ const runSetupSkills = () => {
     // Inject current version into template
     const currentVersion = getLocalVersion();
     template = template.replace(/\{\{VERSION\}\}/g, currentVersion);
+
+    // Copy SUPERPOWERS.md with placeholder substitution
+    if (existsSync(superpowersTemplatePath)) {
+        try {
+            let superpowersContent = readFileSync(superpowersTemplatePath, 'utf8');
+            const currentDate = new Date().toISOString().split('T')[0];
+            superpowersContent = superpowersContent.replace(/\{\{VERSION\}\}/g, currentVersion);
+            superpowersContent = superpowersContent.replace(/\{\{DATE\}\}/g, currentDate);
+            writeFileSync(superpowersMdPath, superpowersContent, 'utf8');
+            console.log('✓ Created .agents/docs/SUPERPOWERS.md');
+        } catch (error) {
+            console.log(`⚠️  Failed to create SUPERPOWERS.md: ${error.message}`);
+        }
+    } else {
+        console.log('⚠️  SUPERPOWERS.md.template not found');
+    }
 
     // Detect platforms
     const projectPlatforms = [];
@@ -297,10 +476,118 @@ const runSetupSkills = () => {
         console.log('⚠️  Failed to update AGENTS.md');
     }
 
-    console.log(`\n# Setup complete!\n\nYour project now has:
-  - .agents/ directory structure
-  - AGENTS.md with universal skills instructions
-  - .agents/skills/ ready for project-specific skills\n`);
+    // Update CLAUDE.md if it exists (prefer root, then .agents/)
+    const claudeMdPath = existsSync(rootClaudeMdPath) ? rootClaudeMdPath : dotAgentsClaudeMdPath;
+    const claudeResult = updatePlatformFile(claudeMdPath, template, ['claude-code'], false);
+    if (claudeResult.created) {
+        const claudeMdLocation = claudeMdPath === rootClaudeMdPath ? 'root' : '.agents/';
+        console.log(`✓ Created CLAUDE.md with Claude Code tool mappings (${claudeMdLocation})`);
+    } else if (claudeResult.updated) {
+        const claudeMdLocation = claudeMdPath === rootClaudeMdPath ? 'root' : '.agents/';
+        console.log(`✓ Updated CLAUDE.md with Claude Code tool mappings (${claudeMdLocation})`);
+        if (claudeResult.backup) {
+            console.log(`  Backed up to ${parse(claudeResult.backup).base}`);
+        }
+    } else if (claudeResult.skipped) {
+        console.log('ℹ️  Skipped CLAUDE.md (does not exist)');
+    } else if (claudeResult.error) {
+        console.log('⚠️  Failed to update CLAUDE.md');
+    }
+
+    // Update GEMINI.md if it exists (prefer root, then .agents/)
+    const geminiMdPath = existsSync(rootGeminiMdPath) ? rootGeminiMdPath : dotAgentsGeminiMdPath;
+    const geminiResult = updatePlatformFile(geminiMdPath, template, ['gemini'], false);
+    if (geminiResult.created) {
+        const geminiMdLocation = geminiMdPath === rootGeminiMdPath ? 'root' : '.agents/';
+        console.log(`✓ Created GEMINI.md with Gemini tool mappings (${geminiMdLocation})`);
+    } else if (geminiResult.updated) {
+        const geminiMdLocation = geminiMdPath === rootGeminiMdPath ? 'root' : '.agents/';
+        console.log(`✓ Updated GEMINI.md with Gemini tool mappings (${geminiMdLocation})`);
+        if (geminiResult.backup) {
+            console.log(`  Backed up to ${parse(geminiResult.backup).base}`);
+        }
+    } else if (geminiResult.skipped) {
+        console.log('ℹ️  Skipped GEMINI.md (does not exist)');
+    } else if (geminiResult.error) {
+        console.log('⚠️  Failed to update GEMINI.md');
+    }
+
+    // Update .github/copilot-instructions.md with Superpowers instructions when GitHub Copilot is detected
+    const copilotInstructionsPath = join(projectRoot, '.github', 'copilot-instructions.md');
+    let copilotResult = { skipped: true };
+
+    if (projectPlatforms.includes('github-copilot')) {
+        copilotResult = updateCopilotInstructions(projectRoot);
+        if (copilotResult.created) {
+            console.log('✓ Created .github/copilot-instructions.md with Superpowers instructions');
+        } else if (copilotResult.updated) {
+            console.log('✓ Updated .github/copilot-instructions.md with Superpowers instructions');
+            if (copilotResult.backup) {
+                console.log(`  Backed up to ${parse(copilotResult.backup).base}`);
+            }
+        } else if (copilotResult.error) {
+            console.log(`⚠️  Failed to update .github/copilot-instructions.md: ${copilotResult.message || ''}`);
+        }
+    } else {
+        console.log('ℹ️  Skipped .github/copilot-instructions.md (GitHub Copilot not detected)');
+    }
+
+    // Update .github/copilot-instructions.md with tool mappings if it exists AND AGENTS.md does NOT exist
+    const agentsMdDoesNotExist = !existsSync(rootAgentsMdPath) && !existsSync(dotAgentsAgentsMdPath);
+    
+    if (existsSync(copilotInstructionsPath) && agentsMdDoesNotExist) {
+        const copilotToolResult = updatePlatformFile(copilotInstructionsPath, template, ['github-copilot'], false);
+        if (copilotToolResult.updated) {
+            console.log('✓ Updated .github/copilot-instructions.md with GitHub Copilot tool mappings');
+            if (copilotToolResult.backup) {
+                console.log(`  Backed up to ${parse(copilotToolResult.backup).base}`);
+            }
+        } else if (copilotToolResult.error) {
+            console.log('⚠️  Failed to update .github/copilot-instructions.md with tool mappings');
+        }
+    } else if (existsSync(copilotInstructionsPath) && !agentsMdDoesNotExist) {
+        console.log('ℹ️  Skipped .github/copilot-instructions.md tool mappings (AGENTS.md exists, using that instead)');
+    } else if (!existsSync(copilotInstructionsPath) && !projectPlatforms.includes('github-copilot')) {
+        console.log('ℹ️  Skipped .github/copilot-instructions.md tool mappings (does not exist)');
+    }
+
+    // Sync project skill symlinks to agent-specific directories
+    console.log('\n## Syncing Project Skill Symlinks\n');
+    const symlinkResults = syncProjectSkillSymlinks({ projectRoot });
+    
+    if (symlinkResults.created > 0) {
+        console.log(`\n✓ Created ${symlinkResults.created} project skill symlink(s)`);
+    } else if (symlinkResults.existed > 0) {
+        console.log('ℹ️  Project skill symlinks already exist');
+    } else if (symlinkResults.errors.length > 0) {
+        console.log(`⚠️  Some symlinks could not be created`);
+    } else {
+        console.log('ℹ️  No agent directories detected for symlinking');
+    }
+
+    // Build dynamic success message based on what was updated
+    let setupMessage = `\n# Setup complete!\n\nYour project now has:
+  - .agents/ directory structure`;
+    
+    if (agentsResult.updated || agentsResult.created) {
+        setupMessage += '\n  - AGENTS.md with universal skills instructions';
+    }
+    if (claudeResult.updated || claudeResult.created) {
+        setupMessage += '\n  - CLAUDE.md with Claude Code skills instructions';
+    }
+    if (geminiResult.updated || geminiResult.created) {
+        setupMessage += '\n  - GEMINI.md with Gemini skills instructions';
+    }
+    if (copilotResult.updated || copilotResult.created) {
+        setupMessage += '\n  - .github/copilot-instructions.md with Superpowers instructions';
+    }
+    if (symlinkResults.created > 0) {
+        setupMessage += `\n  - ${symlinkResults.created} project skill symlink(s) to agent directories`;
+    }
+    setupMessage += '\n  - .agents/skills/ ready for project-specific skills';
+    setupMessage += '\n  - .agents/docs/SUPERPOWERS.md for detailed reference\n';
+    
+    console.log(setupMessage);
 };
 
 /**
@@ -313,6 +600,13 @@ const runBootstrap = () => {
 
     // Check for --no-update flag
     const noUpdate = process.argv.includes('--no-update');
+
+    // Parse --force-<agent> flags
+    const KNOWN_AGENTS = ['copilot', 'cursor', 'codex', 'gemini', 'claude', 'opencode'];
+    const forceAgents = new Set(
+        KNOWN_AGENTS.filter(a => process.argv.includes(`--force-${a}`))
+    );
+    const hasForcedAgents = forceAgents.size > 0;
 
     // Auto-update check
     if (!noUpdate) {
@@ -340,97 +634,121 @@ const runBootstrap = () => {
         }
     }
 
-    // Install universal aliases
-    installAliases();
-    console.log('---\n');
+    // Install universal aliases (skip when targeting specific agents)
+    if (!hasForcedAgents) {
+        installAliases();
+        console.log('---\n');
+    }
 
     // Install GitHub Copilot integration
-    console.log('## GitHub Copilot Integration\n');
-    installCopilotPrompts();
-    console.log('');
-    installCopilotInstructions();
-    console.log('\n---\n');
+    if (!hasForcedAgents || forceAgents.has('copilot')) {
+        console.log('## GitHub Copilot Integration\n');
+        installCopilotPrompts();
+        console.log('\n---\n');
+    }
 
     // Install Cursor integration
-    console.log('## Cursor Integration\n');
-    installCursorCommands();
-    console.log('');
-    installCursorHooks();
-    console.log('\n---\n');
+    if (!hasForcedAgents || forceAgents.has('cursor')) {
+        console.log('## Cursor Integration\n');
+        installCursorCommands();
+        console.log('');
+        installCursorHooks();
+        console.log('\n---\n');
+    }
 
     // Install Codex integration
-    console.log('## OpenAI Codex Integration\n');
-    const codexDetected = toolDetection.codex.check();
-    if (codexDetected) {
-        installCodexPrompts();
-    } else {
-        console.log(`⚠️  Skipped (${toolDetection.codex.name} CLI not detected)\n💡 To enable Codex integration:\n   1. Install Codex: ${toolDetection.codex.installUrl}\n   2. Run: superpowers-agent ${toolDetection.codex.bootstrapCommand}`);
+    if (!hasForcedAgents || forceAgents.has('codex')) {
+        console.log('## OpenAI Codex Integration\n');
+        const codexDetected = toolDetection.codex.check();
+        if (codexDetected) {
+            installCodexPrompts();
+        } else {
+            console.log(`⚠️  Skipped (${toolDetection.codex.name} CLI not detected)\n💡 To enable Codex integration:\n   1. Install Codex: ${toolDetection.codex.installUrl}\n   2. Run: superpowers-agent ${toolDetection.codex.bootstrapCommand}`);
+        }
+        console.log('\n---\n');
     }
-    console.log('\n---\n');
 
     // Install Gemini integration
-    console.log('## Gemini Integration\n');
-    const geminiDetected = toolDetection.gemini.check();
-    if (geminiDetected) {
-        installGeminiCommands();
-    } else {
-        console.log(`⚠️  Skipped (${toolDetection.gemini.name} CLI not detected)\n💡 To enable Gemini integration:\n   1. Install Gemini: ${toolDetection.gemini.installUrl}\n   2. Run: superpowers-agent ${toolDetection.gemini.bootstrapCommand}`);
+    if (!hasForcedAgents || forceAgents.has('gemini')) {
+        console.log('## Gemini Integration\n');
+        const geminiDetected = toolDetection.gemini.check();
+        if (geminiDetected) {
+            installGeminiCommands();
+        } else {
+            console.log(`⚠️  Skipped (${toolDetection.gemini.name} CLI not detected)\n💡 To enable Gemini integration:\n   1. Install Gemini: ${toolDetection.gemini.installUrl}\n   2. Run: superpowers-agent ${toolDetection.gemini.bootstrapCommand}`);
+        }
+        console.log('\n---\n');
     }
-    console.log('\n---\n');
 
     // Install Claude Code integration
-    console.log('## Claude Code Integration\n');
-    const claudeDetected = toolDetection.claude.check();
-    if (claudeDetected) {
-        installClaudeCommands();
-    } else {
-        console.log(`⚠️  Skipped (${toolDetection.claude.name} CLI not detected)\n💡 To enable Claude Code integration:\n   1. Install Claude Code: ${toolDetection.claude.installUrl}\n   2. Run: superpowers-agent ${toolDetection.claude.bootstrapCommand}`);
+    if (!hasForcedAgents || forceAgents.has('claude')) {
+        console.log('## Claude Code Integration\n');
+        const claudeDetected = toolDetection.claude.check();
+        if (claudeDetected) {
+            installClaudeCommands();
+        } else {
+            console.log(`⚠️  Skipped (${toolDetection.claude.name} CLI not detected)\n💡 To enable Claude Code integration:\n   1. Install Claude Code: ${toolDetection.claude.installUrl}\n   2. Run: superpowers-agent ${toolDetection.claude.bootstrapCommand}`);
+        }
+        console.log('\n---\n');
     }
-    console.log('\n---\n');
 
     // Install OpenCode integration
-    console.log('## OpenCode Integration\n');
-    const opencodeDetected = toolDetection.opencode.check();
-    if (opencodeDetected) {
-        installOpencodeCommands();
-    } else {
-        console.log(`⚠️  Skipped (${toolDetection.opencode.name} CLI not detected)\n💡 To enable OpenCode integration:\n   1. Install OpenCode: ${toolDetection.opencode.installUrl}\n   2. Run: superpowers-agent ${toolDetection.opencode.bootstrapCommand}`);
-    }
-    console.log('\n---\n');
-
-    // Generate platform-specific files
-    console.log('## Generating Platform-Specific Files\n');
-    
-    const detectedPlatforms = detectPlatforms();
-    console.log(`Detected platforms: ${detectedPlatforms.join(', ') || 'none'}\n`);
-    
-    const templatePath = join(paths.superpowersRepo, '.agents', 'templates', 'AGENTS.md.template');
-    let baseTemplate = '';
-    try {
-        baseTemplate = readFileSync(templatePath, 'utf8');
-    } catch (error) {
-        console.log(`⚠️  Could not read AGENTS.md template: ${error.message}\n`);
-    }
-    
-    if (baseTemplate) {
-        // Inject current version into template
-        const currentVersion = getLocalVersion();
-        baseTemplate = baseTemplate.replace(/\{\{VERSION\}\}/g, currentVersion);
-        
-        // Update global AGENTS.md
-        const globalAgentsPath = join(paths.home, '.agents', 'AGENTS.md');
-        const globalResult = updatePlatformFile(globalAgentsPath, baseTemplate, detectedPlatforms, true);
-        if (globalResult.created) {
-            console.log(`✓ Created ${globalAgentsPath}`);
-        } else if (globalResult.updated) {
-            console.log(`✓ Updated ${globalAgentsPath}`);
+    if (!hasForcedAgents || forceAgents.has('opencode')) {
+        console.log('## OpenCode Integration\n');
+        const opencodeDetected = toolDetection.opencode.check();
+        if (opencodeDetected) {
+            installOpencodeCommands();
+            console.log('');
+            installOpencodePluginSymlink();
+        } else {
+            console.log(`⚠️  Skipped (${toolDetection.opencode.name} CLI not detected)\n💡 To enable OpenCode integration:\n   1. Install OpenCode: ${toolDetection.opencode.installUrl}\n   2. Run: superpowers-agent ${toolDetection.opencode.bootstrapCommand}`);
         }
+        console.log('\n---\n');
     }
 
+    // Generate platform-specific files (skip when targeting specific agents)
+    if (!hasForcedAgents) {
+        console.log('## Generating Platform-Specific Files\n');
+        
+        const detectedPlatforms = detectPlatforms();
+        console.log(`Detected platforms: ${detectedPlatforms.join(', ') || 'none'}\n`);
+        
+        const templatePath = join(paths.superpowersRepo, '.agents', 'templates', 'AGENTS.md.template');
+        let baseTemplate = '';
+        try {
+            baseTemplate = readFileSync(templatePath, 'utf8');
+        } catch (error) {
+            console.log(`⚠️  Could not read AGENTS.md template: ${error.message}\n`);
+        }
+        
+        if (baseTemplate) {
+            // Inject current version into template
+            const currentVersion = getLocalVersion();
+            baseTemplate = baseTemplate.replace(/\{\{VERSION\}\}/g, currentVersion);
+            
+            // Update global AGENTS.md
+            const globalAgentsPath = join(paths.home, '.agents', 'AGENTS.md');
+            const globalResult = updatePlatformFile(globalAgentsPath, baseTemplate, detectedPlatforms, true);
+            if (globalResult.created) {
+                console.log(`✓ Created ${globalAgentsPath}`);
+            } else if (globalResult.updated) {
+                console.log(`✓ Updated ${globalAgentsPath}`);
+            }
+        }
+
+        console.log('\n---\n');
+    }
+
+    // Sync skill symlinks for Claude and Copilot
+    console.log('## Syncing Skill Symlinks\n');
+    const forceCreate = process.argv.includes('--force');
+    syncAllSkillSymlinks({ force: forceCreate, forceAgents });
     console.log('\n---\n');
+
     console.log('# Bootstrap Complete!\n');
     console.log('✓ All integrations installed');
-    console.log('✓ Skills system ready\n');
+    console.log('✓ Skills system ready');
+    console.log('✓ Skill symlinks synced\n');
     console.log('Next steps:');
     console.log('  - Run `superpowers-agent find-skills` to see available skills');
     console.log('  - Run `superpowers-agent setup-skills` in your project directory');

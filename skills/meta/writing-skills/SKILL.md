@@ -1,9 +1,10 @@
 ---
-name: Writing Skills
+name: writing-skills
 description: TDD for process documentation - test with subagents before writing, iterate until bulletproof
-when_to_use: when creating new skills, editing existing skills, or verifying skills work before deployment
-version: 5.1.0
-languages: all
+metadata:
+  when_to_use: when creating new skills, editing existing skills, or verifying skills work before deployment
+  version: 5.2.0
+  languages: all
 ---
 
 # Writing Skills
@@ -12,7 +13,7 @@ languages: all
 
 **Writing skills IS Test-Driven Development applied to process documentation.**
 
-**Skills are written to `${SUPERPOWERS_SKILLS_ROOT}` (cloned to `~/.config/superpowers/skills/`).** You edit skills in your local branch of this repository.
+**Skills are written to `${AGENT_SKILLS_ROOT}` = `.agents/skills`** You edit skills in your local branch of this repository. Additionally Skills can be installed on a system-wide basis in for all agents to use and at `~/.agents/skills`.
 
 You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
@@ -27,6 +28,30 @@ A **skill** is a reference guide for proven techniques, patterns, or tools. Skil
 **Skills are:** Reusable techniques, patterns, tools, reference guides
 
 **Skills are NOT:** Narratives about how you solved a problem once
+
+## CRITICAL: The Description Trap
+
+DO NOT summarize the workflow in the description field. Agents will follow the short description instead of reading the detailed skill content.
+
+**The Problem:**
+If you write a description like:
+```
+description: "Brainstorm using 4 phases: clarify, explore, refine, document"
+```
+
+The agent will follow the 4-phase summary and skip the actual skill content entirely.
+
+**CORRECT - Trigger only:**
+```
+description: "Use when starting creative work that needs design exploration"
+```
+
+**WRONG - Contains workflow:**
+```
+description: "Brainstorm by asking questions, then presenting design in chunks"
+```
+
+**Rule:** Descriptions must be trigger-only ("Use when X") with NO process details.
 
 ## TDD Mapping for Skills
 
@@ -71,10 +96,10 @@ API docs, syntax guides, tool documentation (office docs)
 
 ## Directory Structure
 
-**All skills are in the skills repository at `${SUPERPOWERS_SKILLS_ROOT}`:**
+**All skills are in the skills repository at `.agents/`:**
 
 ```
-${SUPERPOWERS_SKILLS_ROOT}
+.agents/
   skill-name/
     SKILL.md              # Main reference (required)
     supporting-file.*     # Only if needed
@@ -266,21 +291,15 @@ Use path format without `@` prefix or `/SKILL.md` suffix:
 
 **Why no @ links:** `@` syntax force-loads files immediately, consuming 200k+ context before you need them.
 
-**To read a skill reference:** Use Read tool on `${SUPERPOWERS_SKILLS_ROOT}/category/skill-name/SKILL.md`
+**To read a skill reference:** Use Read tool on `.agents/category/skill-name/SKILL.md`
 
 ## Flowchart Usage
 
-```dot
-digraph when_flowchart {
-    "Need to show information?" [shape=diamond];
-    "Decision where I might go wrong?" [shape=diamond];
-    "Use markdown" [shape=box];
-    "Small inline flowchart" [shape=box];
-
-    "Need to show information?" -> "Decision where I might go wrong?" [label="yes"];
-    "Decision where I might go wrong?" -> "Small inline flowchart" [label="yes"];
-    "Decision where I might go wrong?" -> "Use markdown" [label="no"];
-}
+```mermaid
+flowchart TD
+    A{Need to show information?} -->|yes| B{Decision where I might go wrong?}
+    B -->|yes| C[Small inline flowchart]
+    B -->|no| D[Use markdown]
 ```
 
 **Use flowcharts ONLY for:**
@@ -294,7 +313,7 @@ digraph when_flowchart {
 - Linear instructions → Numbered lists
 - Labels without semantic meaning (step1, helper2)
 
-See @graphviz-conventions.dot for graphviz style rules.
+Use Mermaid `flowchart` syntax (not Graphviz DOT) — it's more widely understood by agents and renders natively on GitHub.
 
 ## Code Examples
 
@@ -528,7 +547,7 @@ Run same scenarios WITH skill. Agent should now comply.
 
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
-**See skills/testing-skills-with-subagents for:**
+**See skills/meta/testing-skills-with-subagents for:**
 - How to write pressure scenarios
 - Pressure types (time, sunk cost, authority, exhaustion)
 - Plugging holes systematically
@@ -545,9 +564,10 @@ example-js.js, example-py.py, example-go.go
 **Why bad:** Mediocre quality, maintenance burden
 
 ### ❌ Code in Flowcharts
-```dot
-step1 [label="import fs"];
-step2 [label="read file"];
+```mermaid
+flowchart TD
+    step1[import fs]
+    step2[read file]
 ```
 **Why bad:** Can't copy-paste, hard to read
 

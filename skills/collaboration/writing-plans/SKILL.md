@@ -1,8 +1,6 @@
 ---
-name: Writing Plans
-description: Create detailed implementation plans with bite-sized tasks for engineers with zero codebase context
-when_to_use: when design is complete and you need detailed implementation tasks for engineers with zero codebase context
-version: 2.1.0
+name: writing-plans
+description: Use when you have a spec or requirements for a multi-step task, before touching code
 ---
 
 # Writing Plans
@@ -13,34 +11,12 @@ Write comprehensive implementation plans assuming the engineer has zero context 
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-**Announce at start:** "I'm using the Writing Plans skill to create the implementation plan."
+**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
 **Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
-## Prompts vs Plans
-
-**Use plans (this skill) when:**
-- Comprehensive implementation (>100 LOC)
-- Multi-phase development with checkpoints
-- Complex features needing detailed roadmap
-
-**Use prompts (creating-prompts skill) when:**
-- Focused, single-purpose tasks (<100 LOC)
-- Lightweight instructions for specific workflows
-- Building prompt chains (research → plan → do)
-
-See skills/meta/creating-prompts for lightweight prompt creation.
-
-**Save plans to:** `.agents/plans/YYYY-MM-DD-<feature-name>.md` (configurable via `.agents/config.json`)
-
-**Get configured directory:**
-```bash
-superpowers-agent get-config plans_dir
-```
-
-**Default:** `.agents/plans/`
-
-**Override:** Set `plans_dir` in `.agents/config.json` (project) or `~/.agents/config.json` (global)
+**Save plans to:** `.agents/superpowers/specs/YYYY-MM-DD-<feature-name>.md`
+- (User preferences for plan location override this default)
 
 ## Bite-Sized Task Granularity
 
@@ -58,7 +34,7 @@ superpowers-agent get-config plans_dir
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **FOR AGENTS** Use `superpowers-agent use-skill executing-plans` to implement this plan task-by-task.
+> **For AGENTS:** REQUIRED SUB-SKILL: Use executing-plans skill to implement this plan task-by-task.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -71,7 +47,7 @@ superpowers-agent get-config plans_dir
 
 ## Task Structure
 
-```markdown
+````markdown
 ### Task N: [Component Name]
 
 **Files:**
@@ -110,7 +86,7 @@ Expected: PASS
 git add tests/path/test.py src/path/file.py
 git commit -m "feat: add specific feature"
 ```
-```
+````
 
 ## Remember
 - Exact file paths always
@@ -123,7 +99,7 @@ git commit -m "feat: add specific feature"
 
 After saving the plan, offer execution choice:
 
-**"Plan complete and saved to `docs/plans/<filename>.md`. Two execution options:**
+**"Plan complete and saved to `.agents/superpowers/specs/<filename>.md`. Two execution options:**
 
 **1. Subagent-Driven (this session)** - I dispatch fresh subagent per task, review between tasks, fast iteration
 
@@ -132,10 +108,10 @@ After saving the plan, offer execution choice:
 **Which approach?"**
 
 **If Subagent-Driven chosen:**
-- Use skills/collaboration/subagent-driven-development
+- **REQUIRED SUB-SKILL:** Use subagent-driven-development skill
 - Stay in this session
 - Fresh subagent per task + code review
 
 **If Parallel Session chosen:**
 - Guide them to open new session in worktree
-- New session uses skills/collaboration/executing-plans
+- **REQUIRED SUB-SKILL:** New session uses executing-plans skill

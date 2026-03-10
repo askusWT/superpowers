@@ -1,75 +1,95 @@
 ---
-name: Brainstorming Ideas Into Designs
-description: Interactive idea refinement using Socratic method to develop fully-formed designs
-when_to_use: when partner describes any feature or project idea, before writing code or implementation plans
-version: 2.2.0
+name: brainstorming
+description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
 ---
 
 # Brainstorming Ideas Into Designs
 
-## Overview
+Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
 
-Transform rough ideas into fully-formed designs through structured questioning and alternative exploration.
+Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
 
-**Core principle:** Ask questions to understand, explore alternatives, present design incrementally for validation.
+<HARD-GATE>
+Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
+</HARD-GATE>
 
-**Announce at start:** "I'm using the Brainstorming skill to refine your idea into a design."
+## Anti-Pattern: "This Is Too Simple To Need A Design"
+
+Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
+
+## Checklist
+
+You MUST create a task for each of these items and complete them in order:
+
+1. **Explore project context** — check files, docs, recent commits
+2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
+3. **Propose 2-3 approaches** — with trade-offs and your recommendation
+4. **Present design** — in sections scaled to their complexity, get user approval after each section
+5. **Write design doc** — save to `docs/plans/YYYY-MM-DD-<topic>-design.md` and commit
+6. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+
+## Process Flow
+
+```dot
+digraph brainstorming {
+    "Explore project context" [shape=box];
+    "Ask clarifying questions" [shape=box];
+    "Propose 2-3 approaches" [shape=box];
+    "Present design sections" [shape=box];
+    "User approves design?" [shape=diamond];
+    "Write design doc" [shape=box];
+    "Invoke writing-plans skill" [shape=doublecircle];
+
+    "Explore project context" -> "Ask clarifying questions";
+    "Ask clarifying questions" -> "Propose 2-3 approaches";
+    "Propose 2-3 approaches" -> "Present design sections";
+    "Present design sections" -> "User approves design?";
+    "User approves design?" -> "Present design sections" [label="no, revise"];
+    "User approves design?" -> "Write design doc" [label="yes"];
+    "Write design doc" -> "Invoke writing-plans skill";
+}
+```
+
+**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
 
 ## The Process
 
-### Phase 1: Understanding
-- Check current project state in working directory
-- Ask ONE question at a time to refine the idea
-- Prefer multiple choice when possible
-- Gather: Purpose, constraints, success criteria
+**Understanding the idea:**
+- Check out the current project state first (files, docs, recent commits)
+- Ask questions one at a time to refine the idea
+- Prefer multiple choice questions when possible, but open-ended is fine too
+- Only one question per message - if a topic needs more exploration, break it into multiple questions
+- Focus on understanding: purpose, constraints, success criteria
 
-### Phase 2: Exploration
-- Propose 2-3 different approaches
-- For each: Core architecture, trade-offs, complexity assessment
-- Ask your human partner which approach resonates
+**Exploring approaches:**
+- Propose 2-3 different approaches with trade-offs
+- Present options conversationally with your recommendation and reasoning
+- Lead with your recommended option and explain why
 
-### Phase 3: Design Presentation
-- Present in 200-300 word sections
-- Cover: Architecture, components, data flow, error handling, testing
-- Ask after each section: "Does this look right so far?"
+**Presenting the design:**
+- Once you believe you understand what you're building, present the design
+- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
+- Ask after each section whether it looks right so far
+- Cover: architecture, components, data flow, error handling, testing
+- Be ready to go back and clarify if something doesn't make sense
 
-### Phase 4: Worktree Setup (for implementation)
-When design is approved and implementation will follow:
-- Announce: "I'm using the Using Git Worktrees skill to set up an isolated workspace."
-- Switch to skills/collaboration/using-git-worktrees
-- Follow that skill's process for directory selection, safety verification, and setup
-- Return here when worktree ready
+## After the Design
 
-### Phase 5: Planning Handoff
-Ask: "Ready to create the implementation plan?"
+**Documentation:**
+- Write the validated design (spec) to `.agents/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+  - (User preferences for spec location override this default)
+- Use elements-of-style:writing-clearly-and-concisely skill if available
+- Commit the design document to git
 
-When your human partner confirms (any affirmative response):
-- Announce: "I'm using the Writing Plans skill to create the implementation plan."
-- Switch to skills/collaboration/writing-plans skill
-- Create detailed plan in the worktree
+**Implementation:**
+- Invoke the writing-plans skill to create a detailed implementation plan
+- Do NOT invoke any other skill. writing-plans is the next step.
 
-## When to Revisit Earlier Phases
+## Key Principles
 
-**You can and should go backward when:**
-- Partner reveals new constraint during Phase 2 or 3 → Return to Phase 1 to understand it
-- Validation shows fundamental gap in requirements → Return to Phase 1
-- Partner questions approach during Phase 3 → Return to Phase 2 to explore alternatives
-- Something doesn't make sense → Go back and clarify
-
-**Don't force forward linearly** when going backward would give better results.
-
-## Related Skills
-
-**During exploration:**
-- When approaches have genuine trade-offs: skills/architecture/preserving-productive-tensions
-
-**Before proposing changes to existing code:**
-- Understand why it exists: skills/research/tracing-knowledge-lineages
-
-## Remember
-- One question per message during Phase 1
-- Apply YAGNI ruthlessly
-- Explore 2-3 alternatives before settling
-- Present incrementally, validate as you go
-- Go backward when needed - flexibility > rigid progression
-- Announce skill usage at start
+- **One question at a time** - Don't overwhelm with multiple questions
+- **Multiple choice preferred** - Easier to answer than open-ended when possible
+- **YAGNI ruthlessly** - Remove unnecessary features from all designs
+- **Explore alternatives** - Always propose 2-3 approaches before settling
+- **Incremental validation** - Present design, get approval before moving on
+- **Be flexible** - Go back and clarify when something doesn't make sense

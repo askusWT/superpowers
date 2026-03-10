@@ -14,7 +14,6 @@ export const installCopilotPrompts = () => {
         return;
     }
     
-    // Create destination directory
     try {
         if (!existsSync(promptsDestDir)) {
             mkdirSync(promptsDestDir, { recursive: true });
@@ -24,7 +23,6 @@ export const installCopilotPrompts = () => {
         return;
     }
     
-    // Copy all .prompt.md files
     let promptFiles;
     try {
         promptFiles = readdirSync(promptsSourceDir)
@@ -54,7 +52,13 @@ export const installCopilotPrompts = () => {
     }
     
     if (installed > 0) {
-        console.log(`\n✓ Installed ${installed} prompt(s) to ${promptsDestDir}\n  Use slash commands in GitHub Copilot:\n    /brainstorm-with-superpowers - Refine ideas into designs\n    /write-a-skill - Create new skills with TDD\n    /skills - Discover available skills\n    /use-skill - Load and apply a specific skill`);
+        console.log(`
+✓ Installed ${installed} prompt(s) to ${promptsDestDir}
+  Use slash commands in GitHub Copilot:
+    /brainstorm - Refine ideas into designs
+    /execute-plan - Execute plans in batches
+    /setup-skills - Initialize project skills
+    /write-plan - Create implementation plans`);
     }
 };
 
@@ -70,7 +74,6 @@ export const installCopilotInstructions = () => {
         return;
     }
     
-    // Create destination directory
     const destDir = dirname(instructionsDest);
     try {
         if (!existsSync(destDir)) {
@@ -81,10 +84,11 @@ export const installCopilotInstructions = () => {
         return;
     }
     
-    // Copy instructions
     try {
         cpSync(instructionsSource, instructionsDest);
-        console.log(`✓ Installed GitHub Copilot universal instructions\n  Location: ${instructionsDest}\n  GitHub Copilot will now use Superpowers skills universally in all workspaces`);
+        console.log(`✓ Installed GitHub Copilot universal instructions
+  Location: ${instructionsDest}
+  GitHub Copilot will now use Superpowers skills universally in all workspaces`);
     } catch (error) {
         console.log(`✗ Failed to install instructions: ${error.message}`);
     }

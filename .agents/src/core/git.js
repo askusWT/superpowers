@@ -119,13 +119,13 @@ export const checkForUpdates = () => {
 export const determineReinstalls = (changedFiles) => {
     const integrationMap = {
         '.github/prompts/': 'copilot-prompts',
-        '.github/copilot-instructions.md': 'copilot-instructions',
         '.cursor/commands/': 'cursor-commands',
         'hooks/cursor/': 'cursor-hooks',
         '.codex/prompts/': 'codex-prompts',
         '.gemini/commands/': 'gemini-commands',
         'commands/': 'claude-commands',
-        '.opencode/command/': 'opencode-commands'
+        '.opencode/command/': 'opencode-commands',
+        '.opencode/plugins/': 'opencode-plugin'
     };
     
     const toReinstall = new Set();

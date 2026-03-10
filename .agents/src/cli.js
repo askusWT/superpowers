@@ -12,7 +12,8 @@ import {
     runDir, 
     runGetHelpers,
     runConfigGet,
-    runConfigSet
+    runConfigSet,
+    runListRepositories
 } from './commands/simple-commands.js';
 
 import { 
@@ -23,7 +24,8 @@ import {
 
 import { 
     runBootstrap, 
-    runSetupSkills 
+    runSetupSkills,
+    installAliases
 } from './commands/bootstrap.js';
 
 import { 
@@ -34,8 +36,7 @@ import {
 
 // Import integration installers
 import { 
-    installCopilotPrompts, 
-    installCopilotInstructions 
+    installCopilotPrompts 
 } from './integrations/copilot.js';
 
 import { 
@@ -80,6 +81,7 @@ const commands = {
     'find-skills': runFindSkills,
     'add': runAdd,
     'add-repository': runAddRepository,
+    'list-repositories': runListRepositories,
     'pull': runPull,
     'dir': runDir,
     'path': runPath,
@@ -87,19 +89,19 @@ const commands = {
     
     // Integration install commands
     'install-copilot-prompts': installCopilotPrompts,
-    'install-copilot-instructions': installCopilotInstructions,
     'install-cursor-commands': installCursorCommands,
     'install-cursor-hooks': installCursorHooks,
     'install-codex-prompts': installCodexPrompts,
     'install-gemini-commands': installGeminiCommands,
     'install-claude-commands': installClaudeCommands,
     'install-opencode-commands': installOpencodeCommands,
+    'install-aliases': installAliases,
     
     // Default help
     'default': () => {
         console.log(`Superpowers for Agents
 Usage:
-  superpowers-agent bootstrap [--no-update]                         # Run complete bootstrap
+  superpowers-agent bootstrap [--no-update] [--force]               # Run complete bootstrap
   superpowers-agent version                                         # Show current version
   superpowers-agent check-updates                                   # Check for updates
   superpowers-agent update [--no-reinstall]                         # Update to latest version
@@ -110,19 +112,20 @@ Usage:
   superpowers-agent find-skills                                     # List available skills
   superpowers-agent add <url-or-path|@alias> [path] [options]      # Install skills
   superpowers-agent add-repository <git-url> [--as=@alias] [opts]  # Add repository alias
+  superpowers-agent list-repositories                              # List configured repository aliases
   superpowers-agent pull <url-or-path|@alias> [path] [options]     # Update skills
   superpowers-agent dir <skill-name>                                # Get skill directory
   superpowers-agent path <skill-name>                               # Get skill file path
   superpowers-agent execute <skill-name>                            # Execute a skill
   superpowers-agent get-helpers <skill> <search-term>               # Get helper file path
   superpowers-agent install-copilot-prompts                         # Install GitHub Copilot prompts
-  superpowers-agent install-copilot-instructions                    # Install universal instructions
   superpowers-agent install-cursor-commands                         # Install Cursor commands
   superpowers-agent install-cursor-hooks                            # Install Cursor hooks
   superpowers-agent install-codex-prompts                           # Install Codex prompts
   superpowers-agent install-gemini-commands                         # Install Gemini commands
   superpowers-agent install-claude-commands                         # Install Claude commands
   superpowers-agent install-opencode-commands                       # Install OpenCode commands
+  superpowers-agent install-aliases                                 # Install universal aliases (superpowers, superpowers-agent)
 
 Documentation: https://github.com/complexthings/superpowers
 `);

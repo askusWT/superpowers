@@ -6,6 +6,702 @@ Release history for the agent-agnostic fork of Superpowers.
 
 ---
 
+## v7.1.2 (March 5, 2026)
+
+### Fixed
+
+- **`--force-<agent>` creates missing agent directories (binary rebuild)** — v7.1.1 documented this fix but the binary was not rebuilt before release. This release ships the rebuilt binary. Running `bootstrap --force-copilot` (or any `--force-<agent>`) now correctly creates the agent's parent directory when it does not exist, instead of skipping with a warning.
+
+---
+
+## v7.1.1 (March 5, 2026)
+
+### Fixed
+
+- **`--force-<agent>` creates missing agent directory** — Previously, if the agent's parent directory (e.g. `~/.copilot`) did not exist, `--force-copilot` would silently skip skill installation. Now the directory is created automatically before installing skills.
+
+---
+
+## v7.1.0 (March 5, 2026)
+
+### Targeted Agent Re-Installation via `--force-<agent>` Flags
+
+The `superpowers-agent bootstrap` command now supports **`--force-<agent>`** flags to re-run only specific agent integrations without repeating the full bootstrap.
+
+**Supported flags:**
+
+| Flag | Re-installs |
+|------|-------------|
+| `--force-copilot` | GitHub Copilot prompts |
+| `--force-cursor` | Cursor slash commands & hooks |
+| `--force-codex` | OpenAI Codex prompts |
+| `--force-gemini` | Gemini CLI commands |
+| `--force-claude` | Claude Code commands |
+| `--force-opencode` | OpenCode commands & plugin symlink |
+
+**Usage examples:**
+```bash
+# Re-install only GitHub Copilot integration
+superpowers-agent bootstrap --force-copilot
+
+# Re-install Copilot and Gemini together
+superpowers-agent bootstrap --force-copilot --force-gemini
+
+# Standard full bootstrap (no flags)
+superpowers-agent bootstrap
+```
+
+**Behavior when force flags are used:**
+- Only the targeted agent sections run
+- Universal aliases installation is skipped
+- Platform-specific `AGENTS.md` generation is skipped
+- Skill symlink sync always runs regardless of flags
+
+---
+
+## v7.0.5 (February 9, 2026)
+
+### Agent Auto-Installation via `agents.json`
+
+The `superpowers-agent add` and `superpowers-agent pull` commands now automatically detect and install **agents** from repositories that contain an `agents.json` manifest file.
+
+**How it works:**
+- When a repository contains an `agents.json` file at its root, the system reads the manifest and installs listed agents to the appropriate platform-specific directories via symlinks
+- Supports **GitHub Copilot** agents (symlinked to VS Code `prompts/` directory) and **OpenCode** agents (symlinked to `~/.config/opencode/agents/`)
+- Platform support is extensible — additional platforms can be added in future versions
+
+**`agents.json` manifest format:**
+```json
+{
+    "version": "1.0.0",
+    "repository": "@my-agents",
+    "agents": {
+        "github": ["agent-name-1", "agent-name-2"],
+        "opencode": ["agent-name-1", "agent-name-2"]
+    }
+}
+```
+
+**Platform path conventions:**
+- `github` agents: Source at `.github/agents/<name>.agent.md`, installed to VS Code User `prompts/` directory
+- `opencode` agents: Source at `.opencode/agents/<name>.md`, installed to `~/.config/opencode/agents/`
+
+**Key features:**
+- Automatic detection — no extra flags needed
+- Agent tracking in `~/.agents/config.json` under `installedAgents` (records source repo, version, and install timestamps)
+- Persistent repository storage at `~/.agents/repos/` for git-sourced repositories (ensures symlinks remain valid after temp clones are cleaned up)
+- Schema validation with clear error messages for malformed manifests
+- Existing agents at destination paths are overwritten (symlinks replaced)
+- Works with both `add` (fresh install) and `pull` (update) commands
+
+### Files Created
+
+```
+.agents/src/agents/platforms.js - Platform path resolution for agent destinations
+.agents/src/agents/installer.js - Core agent installation logic
+```
+
+### Files Modified
+
+```
+.agents/src/skills/installer.js - Hooked agent installation into add/pull commands
+.agents/src/core/config.js - Added agent tracking functions
+.agents/package.json - Version 7.0.5
+```
+
+---
+
+## v7.0.0 (February 7, 2026)
+
+### Build System Migration to Bun
+
+Migrated the `superpowers-agent` CLI build toolchain from Node.js/npm to **Bun**, significantly improving build speed and simplifying the dependency chain.
+
+**Build System:**
+- Refactored `build.js` to use Bun's native bundler
+- Replaced `package-lock.json` with `bun.lock`
+- Switched `packageManager` field to `bun@1.3.8`
+- Added `.husky/pre-commit` hook for automated `package-lock.json` regeneration
+
+### Copilot Instructions: Smart Template Processing
+
+The `installCopilotInstructions()` function now performs **template processing** instead of a simple file copy, injecting the `using-superpowers` skill content directly into `~/.github/copilot-instructions.md`.
+
+**Key improvements:**
+- **`${content}` replacement** - The `.github/copilot-instructions.md` template's `${content}` placeholder is replaced with the full contents of `skills/meta/using-superpowers/SKILL.md` at install time
+- **Marker-based idempotent updates** - Uses `<!-- SUPERPOWERS_-_INSTRUCTIONS_START -->` / `<!-- SUPERPOWERS_-_INSTRUCTIONS_END -->` markers to update content in-place on subsequent runs
+- **Preserves user content** - Existing `~/.github/copilot-instructions.md` files are never overwritten; superpowers content is appended or updated between markers
+- **Automatic backups** - Creates timestamped backups (e.g., `copilot-instructions.md.backup-2026-02-07T...`) before any modification
+- **Update trigger on skill changes** - Changes to `skills/meta/using-superpowers/` now trigger a `copilot-instructions` reinstall during `superpowers-agent update`
+
+### Skill Flowchart Migration: DOT → Mermaid
+
+Replaced all DOT-format flowcharts with **Mermaid syntax** across 8 skills for better rendering compatibility in GitHub, VS Code, and agent contexts.
+
+**Skills updated:**
+- `dispatching-parallel-agents` v1.2.0
+- `subagent-driven-development` v2.1.0
+- `root-cause-tracing` v1.2.0
+- `using-superpowers` v1.1.0
+- `writing-skills` v5.2.0
+- `when-stuck` v1.2.0
+- `condition-based-waiting` v1.2.0
+- `test-driven-development` v3.2.0
+
+### Version Bumps
+
+- `skill.json` → `7.0.0`
+- `package.json` → `7.0.0`
+
+### Files Modified
+
+```
+.agents/build.js - Bun build system
+.agents/bun.lock - NEW: Bun lockfile
+.agents/package.json - Version 7.0.0, Bun packageManager
+.agents/superpowers-agent - Rebuilt bundle
+.agents/src/integrations/copilot.js - Smart template processing
+.agents/src/core/git.js - Skill change triggers copilot-instructions reinstall
+.github/copilot-instructions.md - NEW: Copilot instructions template
+.husky/pre-commit - NEW: Pre-commit hook
+skill.json - Version 7.0.0
+skills/collaboration/dispatching-parallel-agents/SKILL.md - DOT→Mermaid, v1.2.0
+skills/collaboration/subagent-driven-development/SKILL.md - DOT→Mermaid, v2.1.0
+skills/debugging/root-cause-tracing/SKILL.md - DOT→Mermaid, v1.2.0
+skills/meta/using-superpowers/SKILL.md - DOT→Mermaid, v1.1.0
+skills/meta/writing-skills/SKILL.md - DOT→Mermaid, v5.2.0
+skills/problem-solving/when-stuck/SKILL.md - DOT→Mermaid, v1.2.0
+skills/testing/condition-based-waiting/SKILL.md - DOT→Mermaid, v1.2.0
+skills/testing/test-driven-development/SKILL.md - DOT→Mermaid, v3.2.0
+```
+
+### Files Deleted
+
+```
+.agents/package-lock.json - Replaced by bun.lock
+```
+
+---
+
+## v6.5.0 (January 24, 2026)
+
+### Upstream Sync: Advanced Features from obra/superpowers
+
+Ported key features from Jesse Vincent's original [obra/superpowers](https://github.com/obra/superpowers) repository (v4.1.1), adapting them for the agent-agnostic architecture of this fork.
+
+#### High Priority Features
+
+**OpenCode Plugin** (`.opencode/plugins/superpowers-agent.js`)
+- Uses `experimental.chat.system.transform` hook for session bootstrap injection
+- Loads `using-superpowers` skill content at every session start
+- Fixes the "agent reset" issue from older approaches
+- Seamless integration with OpenCode's plugin system
+
+**using-superpowers Skill** (`skills/meta/using-superpowers/`)
+- Behavioral enforcement skill that ensures agents follow Superpowers patterns
+- Red Flags rationalization table with 12 anti-patterns and counters
+- DOT flowchart for skill invocation decision-making
+- Agent-agnostic "How to Access Skills" section
+- Prevents common mistakes like skipping skill loading or inventing workflows
+
+**Two-Stage Code Review Process** (`skills/collaboration/subagent-driven-development/`)
+- **Stage 1: Spec Reviewer** - Validates implementation matches plan/spec requirements
+- **Stage 2: Code Quality Reviewer** - Checks code quality, patterns, and maintainability
+- New helper prompts: `spec-reviewer-prompt.md`, `code-quality-reviewer-prompt.md`, `implementer-prompt.md`
+- Updated SKILL.md with complete two-stage flow and DOT flowcharts
+- Bumped skill to v2.0.0
+
+**CSO Description Trap Warning** (`skills/meta/writing-skills/`)
+- Added warning about Claude Skill Objects where description overrides skill content
+- Correct vs incorrect description examples
+- Prevents accidental behavior changes through metadata
+
+#### Medium Priority Features
+
+**Test Infrastructure** (`tests/`)
+- `tests/skill-triggering/` - Tests for implicit skill triggering scenarios
+- `tests/explicit-skill-requests/` - Tests for explicit skill request handling
+- Agent-agnostic test scripts with environment variable configuration
+- Comprehensive README with usage instructions
+
+**Helper Scripts**
+- `skills/debugging/root-cause-tracing/find-polluter.sh` - Bisection script for finding test pollution
+
+#### Low Priority Features
+
+**Analysis Scripts** (`.agents/scripts/`)
+- `render-graphs.js` - Extracts DOT diagrams from skills and renders to SVG
+- `analyze-token-usage.py` - Analyzes token usage from conversation logs
+
+#### Files Created
+
+```
+.opencode/plugins/superpowers-agent.js
+skills/meta/using-superpowers/SKILL.md
+skills/meta/using-superpowers/skill.json
+skills/collaboration/subagent-driven-development/implementer-prompt.md
+skills/collaboration/subagent-driven-development/spec-reviewer-prompt.md
+skills/collaboration/subagent-driven-development/code-quality-reviewer-prompt.md
+skills/debugging/root-cause-tracing/find-polluter.sh
+.agents/scripts/render-graphs.js
+.agents/scripts/analyze-token-usage.py
+tests/README.md
+tests/skill-triggering/run-test.sh
+tests/skill-triggering/run-all.sh
+tests/skill-triggering/prompts/*.txt
+tests/explicit-skill-requests/run-test.sh
+tests/explicit-skill-requests/prompts/*.txt
+```
+
+#### Files Modified
+
+```
+skills/collaboration/subagent-driven-development/SKILL.md - Two-stage review flow
+skills/collaboration/subagent-driven-development/skill.json - Bumped to v2.0.0
+skills/meta/writing-skills/SKILL.md - CSO description trap warning
+```
+
+#### What Was NOT Ported (By Design)
+
+- **Claude Code Plugin Infrastructure** - Fork is a CLI tool, not IDE plugin
+- **Skills Repository Separation** - Fork's integrated approach is preferred
+- **Codex CLI Script** - Already integrated into main CLI
+
+#### Credits
+
+These features were adapted from Jesse Vincent's [obra/superpowers](https://github.com/obra/superpowers) v4.1.1 with gratitude for his pioneering work on systematic AI agent skills.
+
+---
+
+## v6.4.1 (January 24, 2026)
+
+### AGENTS.md Template Context Optimization
+
+Reduced the context size of AGENTS.md by ~60-70% to improve agent performance and reduce token usage. Detailed reference material is now separated into a dedicated SUPERPOWERS.md file, and agent-specific tool mappings are replaced with generic guidance.
+
+**Key Changes:**
+
+- **New `SUPERPOWERS.md.template`** (108 lines) - Contains detailed reference documentation:
+  - Installation instructions
+  - Version detection details
+  - Skill locations reference
+  - Skill naming conventions
+  - Creating new skills workflow
+  - Common mistakes to avoid
+
+- **New `TOOLS.md.template`** (21 lines) - Generic tool guidance replacing 6 agent-specific files:
+  - Native skill tool usage
+  - Symlinked skills locations
+  - Tool equivalence guidance for cross-platform compatibility
+
+- **Streamlined `AGENTS.md.template`** (40 lines, down from 168 - **76% reduction**):
+  - Clarified two-step skill workflow: **Discover first**, then **Load JIT**
+  - Kept essential: skill discovery, JIT principle, version monitoring, why skills matter
+  - Moved detailed reference to SUPERPOWERS.md
+  - Replaced agent-specific tool mappings with generic TOOLS.md content
+
+- **`setup-skills` now creates `.agents/docs/SUPERPOWERS.md`**:
+  - Creates `.agents/docs/` directory
+  - Copies SUPERPOWERS.md.template with placeholder substitution
+  - Provides detailed reference without loading into agent context
+
+**Deleted Files (replaced by TOOLS.md.template):**
+- `TOOLS-GITHUB-COPILOT.md.template` (53 lines)
+- `TOOLS-CLAUDE-CODE.md.template` (35 lines)
+- `TOOLS-CURSOR.md.template` (31 lines)
+- `TOOLS-GEMINI.md.template` (27 lines)
+- `TOOLS-OPENCODE.md.template` (28 lines)
+- `TOOLS-CODEX.md.template` (25 lines)
+
+**Context Size Comparison:**
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| AGENTS.md.template | 168 lines | 40 lines | **76% smaller** |
+| Tool mappings per agent | 25-53 lines | 21 lines (shared) | **~60% smaller** |
+| Superpowers section in output | ~120+ lines | ~57 lines | **~52% smaller** |
+
+**Files Modified:**
+- `.agents/templates/AGENTS.md.template` - Streamlined content
+- `.agents/templates/SUPERPOWERS.md.template` - NEW: detailed reference
+- `.agents/templates/TOOLS.md.template` - NEW: generic tool guidance
+- `.agents/src/commands/bootstrap.js` - Updated `generateToolMappings()` and `runSetupSkills()`
+
+**Benefits:**
+- Faster agent startup with smaller context
+- Reduced token usage per conversation
+- Cleaner, more focused skill instructions
+- Detailed reference available on-demand in `.agents/docs/SUPERPOWERS.md`
+
+---
+
+## v6.4.0 (January 23, 2026)
+
+### Project-Level Skill Symlinks in setup-skills
+
+The `setup-skills` command now automatically creates symlinks from agent-specific directories to `.agents/skills`, enabling native skill discovery for all major AI coding assistants at the project level.
+
+**Key Features:**
+- Detects agent-specific directories in the project root
+- Creates symlinks from agent directories TO `.agents/skills`
+- Supports all major AI coding platforms
+- Idempotent - safe to run multiple times
+
+**Platform Detection Rules:**
+
+| Agent | Detection Condition | Symlink Target |
+|-------|---------------------|----------------|
+| Claude | `.claude/` exists | `.claude/skills` |
+| GitHub Copilot | `.github/` + `AGENTS.md` exists | `.github/skills` |
+| OpenCode | `.opencode/` + `AGENTS.md` exists | `.opencode/skill` (singular) |
+| Cursor | `.cursor/` exists | `.cursor/skills` |
+| Gemini | `.gemini/` + `GEMINI.md` exists | `.gemini/skills` |
+| Codex | `.codex/` + `AGENTS.md` exists | `.codex/skills` |
+
+**Note:** For platforms requiring `AGENTS.md`, the detection also checks `.agents/AGENTS.md` as a fallback location.
+
+**Usage:**
+```bash
+# In your project directory
+superpowers-agent setup-skills
+```
+
+**Example Output:**
+```
+## Syncing Project Skill Symlinks
+
+  ✓ Created ./.claude/skills -> .agents/skills
+  ✓ Created ./.github/skills -> .agents/skills
+  ✓ Created ./.opencode/skill -> .agents/skills
+  ✓ Created ./.cursor/skills -> .agents/skills
+
+✓ Created 4 project skill symlink(s)
+```
+
+**Symlink Behavior:**
+- Symlinks point FROM agent directories TO `.agents/skills`
+- Skills added to `.agents/skills/` become available in all agent-specific directories
+- Running setup-skills again reports "Project skill symlinks already exist"
+- Existing non-symlink directories are not overwritten (error reported instead)
+
+**Files Modified:**
+- `.agents/src/utils/symlinks.js` - Added `PROJECT_SKILL_PLATFORMS` config and `syncProjectSkillSymlinks()` function
+- `.agents/src/commands/bootstrap.js` - Integrated symlink sync into `runSetupSkills()`
+
+---
+
+## v6.3.4 (January 17, 2026)
+
+### SKILLS.md Updates for agentskills.io Compatibility
+
+Updated SKILLS.md files and agent instructions to follow the specifications from agentskills.io for improved cross-platform skill compatibility.
+
+**Changes:**
+- Updated SKILLS.md files to align with agentskills.io specifications
+- Updated agent instructions for the repository
+
+**Files Modified:**
+- Various SKILLS.md files updated for specification compliance
+- Repository agent instructions updated
+
+---
+
+## v6.3.3 (January 14, 2026)
+
+### Codex Platform Support & Updated TOOLS Templates
+
+Added full Codex platform support for skill symlinks and rewrote all TOOLS template files with accurate, up-to-date tool information from official documentation.
+
+**Codex Skills Symlink Support:**
+- Added Codex to `SKILL_PLATFORMS` array in `symlinks.js`
+- Skills from `~/.agents/skills/` and `~/.agents/superpowers/skills/` now symlinked to `~/.codex/skills/`
+- Added `projectCodexSkills` and `homeCodexSkills` path getters in `paths.js`
+- Updated `AGENTS.md.template` with Codex in Native Skill Tools table and Skill Locations
+
+**Symlink Mapping (after bootstrap):**
+| Source | Codex Target |
+|--------|--------------|
+| `~/.agents/superpowers/skills/` | `~/.codex/skills/superpowers` |
+| `~/.agents/skills/<name>` | `~/.codex/skills/<name>` |
+
+**Updated TOOLS Templates:**
+All 6 TOOLS-*.md.template files were rewritten with accurate tool information from official documentation:
+
+| Template | Source Documentation | Key Updates |
+|----------|---------------------|-------------|
+| `TOOLS-CODEX.md.template` | developers.openai.com | Rewrote with `####` format, added `$skill-name` native skill invocation, documented shell_command, apply_patch, update_plan, web_search_request |
+| `TOOLS-CURSOR.md.template` | cursor.com/docs | Added browser, fetch_rules, codebase_search tools |
+| `TOOLS-GEMINI.md.template` | geminicli.com/docs | Added memory, write_todos, /skills management commands |
+| `TOOLS-OPENCODE.md.template` | opencode.ai/docs | Added LSP tool (experimental), patch tool |
+| `TOOLS-CLAUDE-CODE.md.template` | code.claude.com/docs | Added ExitPlanMode, BashOutput, KillShell, GetDiagnostics, ExecuteCode, plugin/enterprise skill locations |
+| `TOOLS-GITHUB-COPILOT.md.template` | code.visualstudio.com/docs | Fixed markdown hierarchy (`####`), comprehensive VS Code chat tools |
+
+**Files Modified:**
+- `.agents/src/utils/symlinks.js` - Added Codex to SKILL_PLATFORMS
+- `.agents/src/core/paths.js` - Added Codex path getters
+- `.agents/templates/AGENTS.md.template` - Added Codex to skill tables
+- `.agents/templates/TOOLS-CODEX.md.template` - Rewrote with accurate tools
+- `.agents/templates/TOOLS-CURSOR.md.template` - Updated tools
+- `.agents/templates/TOOLS-GEMINI.md.template` - Updated tools
+- `.agents/templates/TOOLS-OPENCODE.md.template` - Updated tools
+- `.agents/templates/TOOLS-CLAUDE-CODE.md.template` - Updated tools
+- `.agents/templates/TOOLS-GITHUB-COPILOT.md.template` - Fixed format, updated tools
+
+---
+
+## v6.3.2 (January 14, 2026)
+
+### Native Skill Tools & Extended Platform Symlinks
+
+Enhanced agent instructions to leverage native skill tools and extended symlink support to all major AI coding platforms.
+
+**Native Skill Tools Section:**
+- Added new "NATIVE SKILL TOOLS" section to `AGENTS.md.template`
+- Instructs agents to attempt native skill tools first, fallback to `superpowers-agent execute`
+- Documents native tool names for each platform:
+  - GitHub Copilot: `Skill` tool
+  - Claude Code: `Skill` tool
+  - OpenCode: `skill` tool
+  - Cursor: Automatic discovery
+  - Gemini: `activate_skill` tool
+
+**Extended Symlink Support:**
+- Added OpenCode, Cursor, and Gemini to automatic skill symlink sync
+- Skills from `~/.agents/skills/` and `~/.agents/superpowers/skills/` now symlinked to:
+  - `~/.config/opencode/skill/` (OpenCode)
+  - `~/.cursor/skills/` (Cursor)
+  - `~/.gemini/skills/` (Gemini)
+- Follows existing behavior: only creates symlinks if parent directory exists
+- Use `--force` flag to create directories if needed
+
+**OpenCode Path Corrections:**
+- Fixed OpenCode skill paths to match OpenCode conventions:
+  - Project: `.opencode/skill/` (singular)
+  - Personal: `~/.config/opencode/skill/` (under `.config`, singular)
+- Updated all references in paths.js, finder.js, parser.js, and AGENTS.md.template
+
+**Added Full Cursor Support:**
+- Added `cursor:` prefix for Cursor-specific skills
+- Added Cursor to skillTypes in parser.js
+- Added Cursor paths to paths.js
+- Added Cursor source labels to finder.js
+
+**Files Modified:**
+- `.agents/templates/AGENTS.md.template` - Native skill tools section, fixed paths, added Cursor
+- `.agents/src/utils/symlinks.js` - Added OpenCode, Cursor, Gemini platforms
+- `.agents/src/core/paths.js` - Fixed OpenCode paths, added Cursor paths
+- `.agents/src/skills/finder.js` - Updated source labels
+- `.agents/src/skills/parser.js` - Added Cursor prefix and skillTypes
+
+**Symlink Mapping (after bootstrap):**
+| Source | OpenCode Target | Cursor Target | Gemini Target |
+|--------|-----------------|---------------|---------------|
+| `~/.agents/superpowers/skills/` | `~/.config/opencode/skill/superpowers` | `~/.cursor/skills/superpowers` | `~/.gemini/skills/superpowers` |
+| `~/.agents/skills/<name>` | `~/.config/opencode/skill/<name>` | `~/.cursor/skills/<name>` | `~/.gemini/skills/<name>` |
+
+---
+
+## v6.3.1 (January 14, 2026)
+
+### Multi-Agent Skill Discovery
+
+Extended `superpowers-agent find-skills` and `execute` commands to discover skills from multiple agent-specific directories at both project and user-home levels.
+
+**New Skill Locations:**
+
+| Level | Directories Added |
+|-------|-------------------|
+| Project | `.copilot/skills/`, `.opencode/skills/`, `.gemini/skills/` |
+| Personal | `~/.claude/skills/`, `~/.copilot/skills/`, `~/.opencode/skills/`, `~/.gemini/skills/` |
+
+**New Prefixes:**
+- `copilot:skill-name` - Target Copilot skill directories
+- `opencode:skill-name` - Target OpenCode skill directories  
+- `gemini:skill-name` - Target Gemini skill directories
+
+**Priority Order:**
+```
+Project Tier (highest):
+  .agents/skills/ > .claude/skills/ > .copilot/skills/ > .opencode/skills/ > .gemini/skills/
+
+Personal Tier:
+  ~/.agents/skills/ > ~/.claude/skills/ > ~/.copilot/skills/ > ~/.opencode/skills/ > ~/.gemini/skills/
+
+Superpowers Tier (lowest):
+  ~/.agents/superpowers/skills/
+```
+
+**Key Features:**
+- Flat priority within tiers - first match wins
+- Symlinks resolved to targets automatically
+- Duplicates shown only once (highest priority wins)
+- Same prefix for project and personal levels (`claude:foo` finds project first, falls back to personal)
+
+**Files Modified:**
+- `.agents/src/core/paths.js` - Added 7 new path getters
+- `.agents/src/skills/parser.js` - Added new prefixes and expanded skillTypes
+- `.agents/src/skills/locator.js` - Updated search order in both locate functions
+- `.agents/src/commands/simple-commands.js` - Updated discovery order
+- `.agents/src/skills/finder.js` - Added source labels for error messages
+- `.agents/templates/AGENTS.md.template` - Updated Skill Locations and Skill Naming sections
+
+**Usage:**
+```bash
+# Find all skills across all agent directories
+superpowers-agent find-skills
+
+# Execute skill from specific agent directory
+superpowers-agent execute copilot:my-skill
+superpowers-agent execute opencode:my-skill
+
+# Priority-based resolution (no prefix needed)
+superpowers-agent execute my-skill  # Finds highest priority match
+```
+
+---
+
+## v6.3.0 (January 14, 2026)
+
+### Automatic Skill Symlinks for Claude Code and GitHub Copilot
+
+Superpowers now automatically creates symlinks to make skills available in Claude Code's `~/.claude/skills/` and GitHub Copilot's `~/.copilot/skills/` directories, enabling native skill discovery in both IDEs.
+
+**Key Features:**
+- **Superpowers skills** symlinked to `~/.claude/skills/superpowers` and `~/.copilot/skills/superpowers`
+- **Personal skills** (from `~/.agents/skills/`) symlinked individually to both platforms
+- **Automatic sync** on `bootstrap`, `update`, `add`, and `pull` commands
+- **Config tracking** in `~/.agents/config.json` for symlink management
+- **Cross-platform support** for Unix/macOS and Windows (with Developer Mode)
+- **`--force` flag** to create parent directories if they don't exist
+
+**Usage:**
+```bash
+# Standard bootstrap (only creates symlinks if ~/.claude/ or ~/.copilot/ exist)
+superpowers-agent bootstrap
+
+# Force creation of parent directories
+superpowers-agent bootstrap --force
+
+# Symlinks auto-sync after adding skills
+superpowers-agent add @myrepo path/to/skill
+```
+
+**Symlink Mapping:**
+| Source | Claude Target | Copilot Target |
+|--------|---------------|----------------|
+| `~/.agents/superpowers/skills/` | `~/.claude/skills/superpowers` | `~/.copilot/skills/superpowers` |
+| `~/.agents/skills/<name>` | `~/.claude/skills/<name>` | `~/.copilot/skills/<name>` |
+
+**Config Tracking:**
+```json
+{
+  "symlinks": {
+    "claude": {
+      "superpowers": "~/.claude/skills/superpowers",
+      "skills": ["~/.claude/skills/acs", "~/.claude/skills/aem"]
+    },
+    "copilot": {
+      "superpowers": "~/.copilot/skills/superpowers",
+      "skills": ["~/.copilot/skills/acs"]
+    }
+  }
+}
+```
+
+**Windows Notes:**
+On Windows, symlinks require Developer Mode enabled or administrator privileges. If symlink creation fails, a warning with instructions is displayed.
+
+**Files Created/Modified:**
+- `.agents/src/utils/symlinks.js` - New centralized symlink management module
+- `.agents/src/commands/bootstrap.js` - Added symlink sync with `--force` flag
+- `.agents/src/commands/update.js` - Added symlink sync after updates
+- `.agents/src/skills/installer.js` - Added symlink sync after `add`/`pull`
+- `.agents/src/cli.js` - Updated help text with `--force` flag
+- `README.md` - Added "Skill Symlinks for IDE Integration" documentation
+- `docs/plans/2026-01-14-skill-symlinks-design.md` - Design document
+
+---
+
+## v6.2.0 (December 16, 2025)
+
+### ✨ New Features
+
+**Enhanced Setup-Skills Tool Mappings**
+
+The `superpowers-agent setup-skills` command now properly populates tool mappings from platform-specific template files, ensuring each agent instruction file gets the correct tool mappings for its platform.
+
+**Key Changes:**
+- `generateToolMappings()` function now reads actual content from `.agents/templates/TOOLS-*.md.template` files instead of generating stub headers
+- Added conditional update logic for `.github/copilot-instructions.md`
+
+**File Update Logic:**
+| File | Tool Mappings | Condition |
+|------|---------------|-----------|
+| `AGENTS.md` | GitHub Copilot, Cursor, OpenCode, Codex | Always updated |
+| `CLAUDE.md` | Claude Code | Only if file exists |
+| `GEMINI.md` | Gemini | Only if file exists |
+| `.github/copilot-instructions.md` | GitHub Copilot | Only if file exists AND AGENTS.md does NOT exist |
+
+**Template File Mapping:**
+- `github-copilot` → `TOOLS-GITHUB-COPILOT.md.template`
+- `cursor` → `TOOLS-CURSOR.md.template`
+- `claude-code` → `TOOLS-CLAUDE-CODE.md.template`
+- `gemini` → `TOOLS-GEMINI.md.template`
+- `opencode` → `TOOLS-OPENCODE.md.template`
+- `codex` → `TOOLS-CODEX.md.template`
+
+**Usage:**
+```bash
+superpowers-agent setup-skills
+```
+
+**Output:**
+```
+✓ Updated AGENTS.md with platform tool mappings (root)
+✓ Updated CLAUDE.md with Claude Code tool mappings (root)
+✓ Updated GEMINI.md with Gemini tool mappings (root)
+ℹ️  Skipped .github/copilot-instructions.md (AGENTS.md exists, using that instead)
+```
+
+**Files Modified:**
+- `.agents/src/commands/bootstrap.js` - Updated `generateToolMappings()` to read template files, added `.github/copilot-instructions.md` conditional logic
+
+---
+
+## v6.1.1 (December 9, 2024)
+
+### 🐛 Bug Fixes
+
+**Fixed installUnixAliases Not Creating Symlinks**
+
+Fixed critical bug where the installation script would not create the required symlinks for `superpowers` and `superpowers-agent` commands, preventing global access to the tools.
+
+**Root Cause:**
+- The `installUnixAliases()` function was only checking if the executable existed but wasn't actually creating the symlinks in `~/.local/bin/`
+- Users running the install script would complete successfully but the commands wouldn't be available globally
+
+**Changes:**
+- Updated `installUnixAliases()` to create `~/.local/bin` directory if it doesn't exist
+- Creates symlinks for both `superpowers` and `superpowers-agent` commands pointing to `~/.agents/superpowers/.agents/superpowers-agent`
+- Properly handles existing symlinks by removing them before creating new ones
+- Added PATH check with warning and instructions if `~/.local/bin` is not in PATH
+- Added new `install-aliases` command for users to manually recreate symlinks if needed
+
+**Usage:**
+```bash
+# Automatically runs during bootstrap
+superpowers-agent bootstrap
+
+# Or manually install/repair symlinks
+superpowers-agent install-aliases
+```
+
+**Files Modified:**
+- `.agents/src/commands/bootstrap.js` - Rewrote `installUnixAliases()` function (lines 148-208)
+- `.agents/src/cli.js` - Added `install-aliases` command to CLI router
+
+---
+
 ## v6.1.0 (December 3, 2025)
 
 ### ✨ New Features

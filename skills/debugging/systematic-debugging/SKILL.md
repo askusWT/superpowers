@@ -8,6 +8,8 @@ metadata:
 ---
 
 # Systematic Debugging
+**Important** also consider nix-debugging skill, check which you need first
+
 
 ## Overview
 

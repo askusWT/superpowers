@@ -1,0 +1,9 @@
+{
+    "version": "1.0",
+    "name": "nix-skills/writing-nix",
+    "title": "Write idiomatic, maintainable, and performant Nix code.",
+    "aliases": [
+        "writing-nix",
+        "nix-skills/writing-nix"
+    ]
+}

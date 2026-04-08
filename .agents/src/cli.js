@@ -28,6 +28,10 @@ import {
     installAliases
 } from './commands/bootstrap.js';
 
+import {
+    runScaffoldSkill
+} from './commands/scaffold-skill.js';
+
 import { 
     runAdd, 
     runAddRepository,
@@ -79,6 +83,7 @@ const commands = {
     'use-skill': () => runUseSkill(process.argv[3]),
     'execute': runExecute,
     'find-skills': runFindSkills,
+    'scaffold-skill': runScaffoldSkill,
     'add': runAdd,
     'add-repository': runAddRepository,
     'list-repositories': runListRepositories,
@@ -110,6 +115,7 @@ Usage:
   superpowers-agent setup-skills                                    # Initialize project skills
   superpowers-agent use-skill <skill-name>                          # Load a skill
   superpowers-agent find-skills                                     # List available skills
+  superpowers-agent scaffold-skill <draft-dir> <skill-path>         # Scaffold a skill package into project or shared scope
   superpowers-agent add <url-or-path|@alias> [path] [options]      # Install skills
   superpowers-agent add-repository <git-url> [--as=@alias] [opts]  # Add repository alias
   superpowers-agent list-repositories                              # List configured repository aliases

@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "name": "commands/zellij",
+  "title": "Zellij Helper",
+  "helpers": [
+    "reference.md"
+  ],
+  "aliases": [
+    "zellij",
+    "commands/zellij"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "name": "testing/shell-config-test",
+  "title": "Shell Config Test",
+  "aliases": [
+    "shell-config-test",
+    "testing/shell-config-test"
+  ]
+}

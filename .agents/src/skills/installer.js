@@ -818,7 +818,7 @@ Description:
         ensureDir(tmpBase);
         tmpDir = join(tmpBase, `repo-add-${Date.now()}`);
 
-        execFileSync('git', ['clone', '--depth', '1', url, tmpDir], { 
+        cp.execFileSync('git', ['clone', '--depth', '1', url, tmpDir], { 
             stdio: 'pipe',
             timeout: 30000 
         });

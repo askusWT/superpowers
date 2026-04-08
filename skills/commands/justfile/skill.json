@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "name": "commands/justfile",
+  "title": "Justfile Helper",
+  "helpers": [
+    "reference.md"
+  ],
+  "aliases": [
+    "justfile",
+    "commands/justfile"
+  ]
+}
